@@ -1,0 +1,4 @@
+# 把 mobile-remote 审批 answerer 插入组合;spike 阶段经 dsh --patch 显式应用
+- insert:
+    - id: mobile-remote
+      name: dsh-plugin-mobile-remote

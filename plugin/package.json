@@ -1,0 +1,17 @@
+{
+  "name": "dsh-plugin-mobile-remote",
+  "version": "0.1.0",
+  "description": "DSH approval remote: subscribe approval requests on the host, decide from your phone over iroh P2P",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
