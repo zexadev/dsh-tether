@@ -8,6 +8,8 @@ const views = { hosts: el('view-hosts'), pair: el('view-pair'), status: el('view
 /** 连接已建立且 web UI 正在显示——决定「取消/返回」该退回哪里 */
 let live = false
 let book = { hosts: [], current: null }
+/** 本次连的是哪台;顶栏据此显示主机名,人才知道自己在操作哪台电脑 */
+let connectingTo = null
 
 function showView(name) {
   for (const [k, v] of Object.entries(views)) v.classList.toggle('hidden', k !== name)
@@ -74,6 +76,12 @@ function notifyApproval({ toolName, reason }) {
 
 const shortId = (id) => id.slice(0, 8) + '…' + id.slice(-4)
 
+/** 主机的显示名:配对时起的名字,没起就退回 ID 缩写 */
+function hostName(id) {
+  const host = book.hosts.find((h) => h.id === id)
+  return host === undefined ? '' : (host.label || shortId(host.id))
+}
+
 function renderHosts() {
   const list = el('host-list')
   list.replaceChildren()
@@ -120,10 +128,14 @@ async function refreshHosts() {
 
 function onState({ status, detail }) {
   if (status === 'connected') {
-    setStatus('connected', '已连接')
+    const named = (id) => { const n = hostName(id); setStatus('connected', n ? `已连接 · ${n}` : '已连接') }
+    named(connectingTo)
+    // 刚配对完的主机还不在本地簿里,取回来补上名字
+    if (hostName(connectingTo) === '') refreshHosts().then(() => named(connectingTo)).catch(() => {})
     el('reconnect-row').classList.add('hidden')
   } else if (status === 'connecting') {
-    setStatus('connecting', '连接中…')
+    const n = hostName(connectingTo)
+    setStatus('connecting', n ? `连接 ${n}…` : '连接中…')
   } else {
     live = false
     setStatus('disconnected', '未连接')
@@ -144,6 +156,7 @@ function onState({ status, detail }) {
 }
 
 function startConnect(id) {
+  connectingTo = id ?? book.current ?? (book.hosts[0]?.id ?? null)
   el('reconnect-row').classList.add('hidden')
   el('connecting-note').classList.remove('hidden')
   showView('status')
@@ -178,6 +191,7 @@ el('pair-submit').addEventListener('click', async () => {
   live = false
   el('connecting-note').classList.remove('hidden')
   showView('status')
+  connectingTo = peer
   try {
     await invoke('pair', { peer, code, name: el('pair-name').value, label: el('pair-label').value })
     await refreshHosts()

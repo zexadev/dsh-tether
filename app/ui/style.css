@@ -63,7 +63,9 @@ body {
 .topbar.slim { padding: calc(env(safe-area-inset-top, 0px) + 5px) 12px 5px; }
 .brand { flex: 1; font-size: 15px; font-weight: 500; }
 .topbar.slim .brand { display: none; }
-.status { flex: 1; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.status { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+/* 主机名可能很长,让它省略而不是把「换主机」挤出屏幕 */
+#status-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .dot-off { background: var(--muted); }
 .dot-connecting { background: var(--warn); }
