@@ -1,0 +1,21 @@
+[package]
+name = "dsh-remote-app"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "dsh_remote_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.3", features = [] }
+
+[dependencies]
+anyhow = "1"
+iroh = "1.0.0"
+remote-core = { path = "../../remote-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2.9.5", features = [] }
+tokio = { version = "1", features = ["sync", "time"] }

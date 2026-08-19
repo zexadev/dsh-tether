@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DSH Remote",
+  "version": "0.1.0",
+  "identifier": "cc.zexa.dshremote",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "DSH Remote",
+        "width": 420,
+        "height": 780
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
+}
