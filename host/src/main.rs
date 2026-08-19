@@ -295,6 +295,9 @@ async fn handle_phone(incoming: iroh::endpoint::Incoming, state: Arc<Mutex<HostS
                     }
                     drop(s);
                     write_line(&mut send, &serde_json::to_string(&Wire::PairFail { reason: reason.into() })?).await?;
+                    // finish + 短等:让 PairFail 行先于连接关闭到达对端,失败原因不被 close 吃掉
+                    let _ = send.finish();
+                    tokio::time::sleep(Duration::from_millis(200)).await;
                     conn.close(1u8.into(), b"pair-fail");
                     return Ok(());
                 }
