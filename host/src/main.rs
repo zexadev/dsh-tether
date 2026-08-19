@@ -94,6 +94,8 @@ enum PluginOut {
     PairingClosed { reason: String },
     PairingDone { peer: String, name: String },
     PeerConnected { peer: String, name: String },
+    /// 连接路径:direct=NAT 打洞直连 / relay=经中转
+    PeerPath { peer: String, kind: String, remote: String },
     PeerDisconnected { peer: String },
     Decision { id: String, outcome: String },
 }
@@ -328,6 +330,32 @@ async fn handle_phone(
         s.conns.insert(remote.clone(), tx);
     }
     emit(&PluginOut::PeerConnected { peer: remote.clone(), name: device_name });
+
+    // 连接刚建立时通常还在 relay 路径;给 NAT 打洞几秒升级窗口再报,
+    // 否则跨网验收会把「还没打通」误读成「打不通」。
+    {
+        let conn = conn.clone();
+        let peer = remote.clone();
+        tokio::spawn(async move {
+            let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
+            loop {
+                let selected = conn.paths().iter().find(|p| p.is_selected()).map(|p| {
+                    let addr = p.remote_addr();
+                    (if addr.is_ip() { "direct" } else { "relay" }, format!("{addr:?}"))
+                });
+                let done = tokio::time::Instant::now() >= deadline;
+                if let Some((kind, remote_addr)) = selected {
+                    if kind == "direct" || done {
+                        emit(&PluginOut::PeerPath { peer, kind: kind.to_string(), remote: remote_addr });
+                        return
+                    }
+                } else if done {
+                    return
+                }
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+        });
+    }
 
     let writer = async {
         while let Some(line) = rx.recv().await {

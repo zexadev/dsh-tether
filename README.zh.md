@@ -67,9 +67,16 @@ pnpm exec tauri android build --apk --target aarch64
 | WebSocket 事件下行经 iroh | ✅ 持有 60s、空闲 5min,与直连一致 |
 | HTTP 延迟 / 20 路并发 | ✅ 21ms、20/20 |
 | 审批送达手机、agent 继续 | ✅ 真机 |
-| **跨网络(4G ↔ 家宽)** | ⏳ **尚未在真机上跑过** |
+| **跨网络(手机关 WiFi 走 5G ↔ 电脑家宽)** | ✅ **真机,NAT 打洞直连,未走 relay** |
 
-最后一行是整个项目的立意所在,所以明写出来,不含糊过去。
+最后一行是整个项目的立意所在,所以给证据而不是给说法。手机 WiFi 关掉(`wifi_on=0`,状态栏只剩 5G)、电脑在家宽,插件侧输出:
+
+```
+[mobile-remote] 手机已连接: 我的手机
+[mobile-remote] 连接路径: P2P 直连(NAT 打洞成功) Ip(152.67.154.117:41341)
+```
+
+选中路径是一个公网地址,说明两端是打洞打通的,relay 全程没用上。(手机还开着 VPN,所以对端地址是它的 VPN 出口——结论不变:两个不同的网络,中间没有服务器。)手机在这条路径上完整渲染了 DSH 界面,见 [`assets/phone-cellular.png`](assets/phone-cellular.png)。
 
 ## 已知限制
 

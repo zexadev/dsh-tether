@@ -66,6 +66,11 @@ function apply(ctx, config = {}) {
       case 'peer-connected':
         console.log(`[mobile-remote] 手机已连接: ${msg.name}`)
         break
+      case 'peer-path':
+        console.log(msg.kind === 'direct'
+          ? `[mobile-remote] 连接路径: P2P 直连(NAT 打洞成功) ${msg.remote}`
+          : `[mobile-remote] 连接路径: relay 中转(打洞未成,可用但延迟略高) ${msg.remote}`)
+        break
       case 'peer-disconnected':
         console.log('[mobile-remote] 手机已断开')
         break

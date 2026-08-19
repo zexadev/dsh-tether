@@ -67,9 +67,16 @@ Tested against **dsh `0.1.0-rc.7`** (the ecosystem has split — the desktop cli
 | WebSocket event downlink over iroh | ✅ 60s hold and 5min idle, identical to direct |
 | HTTP latency / 20-way concurrency | ✅ 21ms, 20/20 |
 | Approval reaches the phone, agent continues | ✅ real device |
-| **Across networks (4G ↔ home broadband)** | ⏳ **not yet run on a real device** |
+| **Across networks (phone on 5G, Wi-Fi off ↔ PC on home broadband)** | ✅ **real device, hole-punched direct — no relay** |
 
-The last row is the whole point of the project, so it is called out rather than implied.
+The last row is the whole point of the project, so here is the evidence rather than a claim. With the phone's Wi-Fi switched off (`wifi_on=0`, only 5G in the status bar) and the machine on home broadband, the plugin reported:
+
+```
+[mobile-remote] 手机已连接: 我的手机
+[mobile-remote] 连接路径: P2P 直连(NAT 打洞成功) Ip(152.67.154.117:41341)
+```
+
+A public address on the selected path means the two ends hole-punched through to each other; the relay was never used. (The phone also had a VPN on, so the peer address is its VPN exit — the point stands: two different networks, no server in between.) The phone rendered the full DSH web UI over that path — see [`assets/phone-cellular.png`](assets/phone-cellular.png).
 
 ## Known limitations
 
