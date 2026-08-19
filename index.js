@@ -9,6 +9,7 @@
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -24,9 +25,14 @@ const CONFIG_DOCUMENT_PATH = '/dsh-tether/config-document'
  * @param {{hostBinary?: string, pair?: boolean}} [config]
  */
 function apply(ctx, config = {}) {
-  const binary = config.hostBinary ?? defaultHostBinary()
-  if (!existsSync(binary)) {
-    throw new Error(`[tether] 找不到 sidecar 二进制: ${binary}(先 cargo build -p tether-host,或在插件 config.hostBinary 指定路径)`)
+  const binary = config.hostBinary ?? resolveHostBinary()
+  if (binary === undefined || !existsSync(binary)) {
+    throw new Error(
+      `[tether] 找不到 sidecar 二进制(平台 ${process.platform}-${process.arch})。`
+      + '从源码用:先跑 cargo build --release -p tether-host;'
+      + '或在插件 config.hostBinary 里指定路径。'
+      + '若你是从 npm/GitHub 安装的,说明该平台的 dsh-tether-host-* 子包还没发布,请提 issue。',
+    )
   }
   // webServer.port 是真实监听端口(config 写 0 时为 OS 分配值),手机由此拿到完整界面
   const proxyTarget = `${ctx.webServer.host}:${ctx.webServer.port}`
@@ -336,10 +342,27 @@ function injectNarrowScreenCss(html) {
   )
 }
 
-function defaultHostBinary() {
-  const here = dirname(fileURLToPath(import.meta.url))
+/**
+ * sidecar 二进制的解析顺序:
+ * 1. 平台子包 `dsh-tether-host-<platform>-<arch>` —— 发布路径。子包声明 os/cpu,
+ *    npm 只装匹配当前平台的那一个(dsh 自己的 node-addon-landlock-run 同款结构)。
+ * 2. 仓库内 cargo 产物 —— 开发路径,release 优先于 debug。
+ * 返回 undefined 表示两处都没有,由调用方给出可操作的报错。
+ */
+function resolveHostBinary() {
   const exe = process.platform === 'win32' ? 'tether-host.exe' : 'tether-host'
-  return join(here, '..', 'target', 'debug', exe)
+  const platformPackage = `dsh-tether-host-${process.platform}-${process.arch}`
+  try {
+    return createRequire(import.meta.url).resolve(`${platformPackage}/bin/${exe}`)
+  } catch {
+    // 未安装平台子包(源码使用或该平台尚未发布),继续找本地构建
+  }
+  const here = dirname(fileURLToPath(import.meta.url))
+  for (const profile of ['release', 'debug']) {
+    const candidate = join(here, 'target', profile, exe)
+    if (existsSync(candidate)) return candidate
+  }
+  return undefined
 }
 
 export { name, inject, apply }

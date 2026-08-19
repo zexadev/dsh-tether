@@ -39,15 +39,28 @@ Approvals are answered by DSH's own web UI on your phone — this plugin deliber
 
 ## Install
 
-Requires Node ^22.19 || >=24, Rust, and (for building the APK) JDK 21 + Android SDK/NDK. `scripts/setup-android-env.ps1` sets up the Android side on Windows.
+### On your machine (the plugin)
 
 ```sh
-cargo build --release -p tether-host       # the plugin's sidecar
-dsh plugin --profile web add /path/to/dsh-tether/plugin
-dsh web                                            # prints the pairing string
+dsh plugin --profile web add github:zexadev/dsh-tether
+dsh web                                    # prints the pairing string
 ```
 
-Build the phone app:
+`dsh plugin` forwards its arguments to pnpm, so an npm name, a `github:` spec, or a local path all work.
+
+The sidecar is a Rust binary shipped as per-platform `dsh-tether-host-<platform>` packages that the main package pulls in automatically (the same structure dsh uses for `node-addon-landlock-run`). **Only win32-x64 is published so far**; on other platforms build it from source first:
+
+```sh
+git clone https://github.com/zexadev/dsh-tether && cd dsh-tether
+cargo build --release -p tether-host       # the plugin falls back to this
+dsh plugin --profile web add .
+```
+
+### On your phone
+
+Install the APK from Releases, then paste the pairing string (`<host-id>#<code>`) that `dsh web` printed.
+
+Building the APK from source needs Node ^22.19 || >=24, Rust, and JDK 21 + Android SDK/NDK (`scripts/setup-android-env.ps1` sets the Android side up on Windows):
 
 ```sh
 cd app && pnpm install

@@ -39,13 +39,28 @@ DSH 的手机客户端已经有九个。除了这个,另外两个值得你知道
 
 ## 安装
 
-需要 Node ^22.19 || >=24、Rust,构建 APK 还需 JDK 21 + Android SDK/NDK。Windows 上可用 `scripts/setup-android-env.ps1` 装齐 Android 那一侧。
+### 电脑侧(插件)
 
 ```sh
-cargo build --release -p tether-host       # 插件的 sidecar
-dsh plugin --profile web add /path/to/dsh-tether/plugin
-dsh web                                            # 会打印配对串
+dsh plugin --profile web add github:zexadev/dsh-tether
+dsh web                                    # 会打印配对串
 ```
+
+`dsh plugin` 直接把参数转发给 pnpm,所以 npm 包名、`github:` 规格、本地路径都能装。
+
+sidecar 是个 Rust 二进制,按平台拆成 `dsh-tether-host-<平台>` 子包由主包自动引入(和 dsh 自己的 `node-addon-landlock-run` 同款结构)。**目前只发布了 win32-x64**;其它平台请先从源码构建:
+
+```sh
+git clone https://github.com/zexadev/dsh-tether && cd dsh-tether
+cargo build --release -p tether-host       # 插件会回退到这个产物
+dsh plugin --profile web add .
+```
+
+### 手机侧
+
+装 Release 里的 APK,打开后把 `dsh web` 打印的配对串(`<主机ID>#<配对码>`)整行粘进去。
+
+从源码构建 APK 需要 Node ^22.19 || >=24、Rust、JDK 21 + Android SDK/NDK(Windows 上可用 `scripts/setup-android-env.ps1` 装齐):
 
 构建手机 App:
 

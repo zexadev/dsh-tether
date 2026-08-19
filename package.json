@@ -1,0 +1,46 @@
+{
+  "name": "dsh-plugin-tether",
+  "version": "0.1.0",
+  "description": "Reach the DeepSeek Harness on your dev machine from your phone — across networks, through no server at all (iroh P2P)",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "android",
+    "p2p",
+    "iroh"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-host-webserver": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-user-approval": "0.1.0-rc.7"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-host-webserver": { "optional": true },
+    "@deepseek-ai/dsh-user-approval": { "optional": true }
+  },
+  "optionalDependencies": {
+    "dsh-tether-host-darwin-arm64": "0.1.0",
+    "dsh-tether-host-darwin-x64": "0.1.0",
+    "dsh-tether-host-linux-arm64": "0.1.0",
+    "dsh-tether-host-linux-x64": "0.1.0",
+    "dsh-tether-host-win32-x64": "0.1.0"
+  }
+}
