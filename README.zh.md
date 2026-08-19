@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/banner.png" alt="手机与开发机直接相连,中间没有服务器" width="800"></p>
+<p align="center"><img src="assets/banner.jpg" alt="手机与开发机直接相连,中间没有服务器" width="800"></p>
 
 <h1 align="center">DSH Tether</h1>
 

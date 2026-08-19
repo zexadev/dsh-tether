@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/banner.png" alt="Phone tethered directly to a dev machine — no server in between" width="800"></p>
+<p align="center"><img src="assets/banner.jpg" alt="Phone tethered directly to a dev machine — no server in between" width="800"></p>
 
 <h1 align="center">DSH Tether</h1>
 
