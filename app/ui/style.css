@@ -7,8 +7,8 @@
   --muted: #667085;
   --accent: #175cd3;
   --accent-press: #114a9f;
-  --danger: #3f4654;
-  --danger-press: #2c3240;
+  --quiet: #3f4654;
+  --quiet-press: #2c3240;
   --ok: #12805c;
   --line: #e4e7ec;
 }
@@ -21,20 +21,26 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* 安卓手势条 / 刘海:内容不被系统 UI 压住 */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* 顶栏:连上之后它没有信息价值,收成一条窄带把高度还给 dsh 的界面 */
 .topbar {
   flex: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 14px;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px 12px;
   background: var(--card);
   border-bottom: 1px solid var(--line);
 }
-.brand { font-size: 17px; font-weight: 700; letter-spacing: 0.2px; }
-.status { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 13px; }
-.dot { width: 9px; height: 9px; border-radius: 50%; }
+.topbar.slim { padding: calc(env(safe-area-inset-top, 0px) + 5px) 12px 5px; }
+.brand { flex: 1; font-size: 17px; font-weight: 700; letter-spacing: 0.2px; }
+.topbar.slim .brand { display: none; }
+.status { flex: 1; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.topbar.slim .status { font-size: 12px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .dot-off { background: #98a2b3; }
 .dot-connecting { background: #f79009; }
 .dot-on { background: var(--ok); }
@@ -42,7 +48,7 @@ body {
 .view {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  padding: 20px 16px;
   max-width: 520px;
   width: 100%;
   margin: 0 auto;
@@ -51,6 +57,7 @@ body {
 
 h1 { font-size: 20px; margin-bottom: 10px; }
 .hint { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
+code { font-family: ui-monospace, Consolas, monospace; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
 
 label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 14px; }
 input {
@@ -58,7 +65,7 @@ input {
   width: 100%;
   margin-top: 6px;
   padding: 11px 12px;
-  font-size: 15px;
+  font-size: 16px; /* 低于 16px 时移动浏览器会在聚焦时自动放大页面 */
   color: var(--text);
   background: var(--card);
   border: 1px solid var(--line);
@@ -68,7 +75,6 @@ input {
 input:focus { border-color: var(--accent); }
 
 .btn {
-  display: inline-block;
   border: none;
   border-radius: 8px;
   padding: 12px 18px;
@@ -80,40 +86,13 @@ input:focus { border-color: var(--accent); }
   -webkit-tap-highlight-color: transparent;
 }
 .btn:active { background: var(--accent-press); }
-.btn-block { display: block; width: 100%; margin-top: 6px; }
-.btn-danger { background: var(--danger); }
-.btn-danger:active { background: var(--danger-press); }
+.btn-block { display: block; width: 100%; margin-top: 10px; }
+.btn-quiet { background: var(--quiet); }
+.btn-quiet:active { background: var(--quiet-press); }
+.btn-slim { flex: none; padding: 6px 12px; font-size: 12px; border-radius: 6px; background: var(--quiet); }
+.btn-slim:active { background: var(--quiet-press); }
 
 .error { color: #b42318; font-size: 13px; margin: 0 0 12px; }
-
-.reconnect-row { margin-bottom: 16px; }
-
-.card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px;
-  margin-bottom: 12px;
-}
-.card .tool {
-  display: inline-block;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--accent);
-  background: #eaf1fd;
-  border-radius: 6px;
-  padding: 3px 8px;
-  margin-bottom: 8px;
-}
-.card .reason {
-  font-size: 14px;
-  line-height: 1.65;
-  color: var(--text);
-  word-break: break-word;
-  margin-bottom: 12px;
-}
-.card .actions { display: flex; gap: 10px; }
-.card .actions .btn { flex: 1; }
 
 .webui {
   flex: 1;

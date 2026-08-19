@@ -7,36 +7,39 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">DSH Remote</div>
+  <header class="topbar" id="topbar">
+    <div class="brand" id="brand">DSH Remote</div>
     <div class="status">
       <span id="status-dot" class="dot dot-off"></span>
       <span id="status-text">未连接</span>
     </div>
+    <button id="switch-host" class="btn btn-slim hidden">换主机</button>
   </header>
 
   <main id="view-pair" class="view hidden">
     <h1>配对主机</h1>
-    <p class="hint">在电脑上启动 dsh 后,插件会打印主机 ID 与 6 位配对码。可直接粘贴「ID#配对码」组合串。</p>
-    <label>主机 ID
-      <input id="pair-peer" type="text" autocomplete="off" spellcheck="false" placeholder="64 位十六进制,或 ID#配对码" />
+    <p class="hint">电脑上跑 <code>dsh web</code> 后,插件会打印一行配对串,整行粘到下面即可。</p>
+    <label>配对串(主机 ID#配对码)
+      <input id="pair-peer" type="text" autocomplete="off" spellcheck="false" placeholder="粘贴整行,或只填主机 ID" />
     </label>
-    <label>配对码
+    <label>配对码(已在上面粘贴则免填)
       <input id="pair-code" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="6 位数字" />
     </label>
     <label>设备名称
       <input id="pair-name" type="text" autocomplete="off" value="我的手机" />
     </label>
     <p id="pair-error" class="error hidden"></p>
-    <button id="pair-submit" class="btn btn-primary btn-block">配对并连接</button>
+    <button id="pair-submit" class="btn btn-block">配对并连接</button>
+    <button id="pair-cancel" class="btn btn-quiet btn-block hidden">取消</button>
   </main>
 
   <main id="view-main" class="view hidden">
-    <div id="reconnect-row" class="reconnect-row hidden">
+    <div id="reconnect-row" class="hidden">
       <p id="reconnect-text" class="hint"></p>
-      <button id="reconnect" class="btn btn-primary btn-block">重新连接</button>
+      <button id="reconnect" class="btn btn-block">重新连接</button>
+      <button id="repair" class="btn btn-quiet btn-block">换一台主机</button>
     </div>
-    <p class="empty">正在打开主机的 DeepSeek Harness 界面…</p>
+    <p id="connecting-note" class="empty">正在打开主机上的 DeepSeek Harness…</p>
   </main>
 
   <iframe id="webui" class="webui hidden" title="DeepSeek Harness"></iframe>

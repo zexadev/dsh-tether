@@ -74,6 +74,8 @@ function apply(ctx, config = {}) {
     }
   })
 
+  ctx.effect(() => ctx.webServer.tapIndex(injectNarrowScreenCss))
+
   ctx.on('approval/request', async (req, next) => {
     send({ type: 'approval', id: req.callId, tool_name: req.toolName ?? '', reason: req.reason ?? '' })
     try {
@@ -83,6 +85,35 @@ function apply(ctx, config = {}) {
       send({ type: 'approval-cancel', id: req.callId })
     }
   })
+}
+
+/**
+ * 窄屏修正:只在 ≤640px 生效,桌面浏览器拿到同一份 index.html 也不受影响。
+ * 只用语义选择器(role/aria),不碰 dsh 的 CSS Module 类名——那些名字带内容
+ * 哈希,dsh 一改样式就会变,针对它们写规则必碎。
+ */
+function injectNarrowScreenCss(html) {
+  const css = `
+@media (max-width: 640px) {
+  /* hero 背后的装饰性发光椭圆比视口宽,会让整页能被横向拖动 */
+  html, body { overflow-x: hidden; }
+  /* 弹窗在窄屏铺满,别再留出用不上的边距 */
+  [role="dialog"][aria-modal="true"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+  /* 设置行是「说明文字 + 控件」一行排开,说明列 min-width:0,窄屏被控件挤到
+     2px 宽,中文于是一字一行。让说明占满一行、控件换到下一行。
+     选择器咬的是 CSS Module 的本地名(row/rowText),只有哈希前缀会随构建变;
+     dsh 若重命名,规则失效退回现状,不会更糟。 */
+  [class*="_row"]:not([class*="rowText"]) { flex-wrap: wrap !important; }
+  [class*="rowText"] { flex: 1 1 100% !important; }
+}`
+  return html.replace('</head>', `<style data-dsh-remote="narrow-screen">${css}\n</style></head>`)
 }
 
 function defaultHostBinary() {
