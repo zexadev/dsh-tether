@@ -117,6 +117,46 @@ function injectNarrowScreenCss(html) {
      dsh 若重命名,规则失效退回现状,不会更糟。 */
   [class*="_row"]:not([class*="rowText"]) { flex-wrap: wrap !important; }
   [class*="rowText"] { flex: 1 1 100% !important; }
+
+  /* 弹窗是「左导航 + 右内容」横向排列,导航固定 188px——在 412px 的手机上
+     占掉 45%,内容只剩两百出头。改成导航横排在顶、内容占满整宽。
+     导航是 <nav> 标签、内容是弹窗下唯一的直接 div,都用结构选择器命中。 */
+  [role="dialog"][aria-modal="true"] { display: flex !important; flex-direction: column !important; }
+  [role="dialog"][aria-modal="true"] > nav {
+    width: 100% !important;
+    height: auto !important;
+    flex: none !important;
+  }
+  [role="dialog"][aria-modal="true"] > nav [class*="navList"] {
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    height: auto !important;
+    gap: 6px;
+    scrollbar-width: none;
+  }
+  [role="dialog"][aria-modal="true"] > nav [class*="navList"]::-webkit-scrollbar { display: none; }
+  [role="dialog"][aria-modal="true"] > nav [class*="navCell"] {
+    flex: none !important;
+    width: auto !important;
+    white-space: nowrap;
+  }
+  [role="dialog"][aria-modal="true"] > div {
+    width: 100% !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+  /* 竖排之后,内容区自带的头部(打开配置文件 + 关闭)会落到标签栏下方、屏幕
+     正中,很别扭。钉到弹窗右上角,与标题同一行——手机弹窗关闭键就该在那儿。 */
+  [role="dialog"][aria-modal="true"] { position: relative !important; }
+  [role="dialog"][aria-modal="true"] > div > [class*="_header"] {
+    position: absolute !important;
+    top: 10px;
+    right: 12px;
+    left: auto !important;
+    width: auto !important;
+    height: auto !important;
+    z-index: 2;
+  }
 }`
   return html.replace('</head>', `<style data-dsh-remote="narrow-screen">${css}\n</style></head>`)
 }
