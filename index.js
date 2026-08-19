@@ -22,6 +22,51 @@ const CONFIG_DOCUMENT_PATH = '/dsh-tether/config-document'
 /** 按需开一个配对窗口,拿回配对串 */
 const PAIRING_PATH = '/dsh-tether/pairing'
 
+/** dsh 的回环判定:localhost、IPv6 回环、以及整个 127/8 */
+function isLoopbackHostname(hostname) {
+  if (hostname === 'localhost' || hostname === '[::1]') return true
+  const parts = hostname.split('.')
+  return parts.length === 4 && parts[0] === '127'
+    && parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255)
+}
+
+/**
+ * 浏览器信任栅栏,判据照抄 dsh 自己 `/api` 那套(它的 isTrustedApiRequest 没有
+ * 从包里导出,只能同判据重写一份):Host 必须是回环权威;带 `sec-fetch-site:
+ * cross-site` 标记的一律拒;带 Origin 时其 authority 必须与 Host 相同。
+ *
+ * 挡的是浏览器打开的两条「受骗代理」路径:DNS 重绑定(Host 写攻击者域名而套接字
+ * 落到本机)和恶意页面发出的跨站请求。**挡不住本机进程** —— 本机 curl 的 Host
+ * 就是回环,照样通过,这是这套栅栏的设计边界,不是实现疏漏。
+ *
+ * 这里不接受 trustedHosts:本插件的路由只服务本机,没有远程授权的语义。
+ */
+function isTrustedRequest(req) {
+  const host = req.headers.host
+  if (typeof host !== 'string') return false
+  let hostUrl
+  try {
+    hostUrl = new URL(`http://${host}`)
+  } catch {
+    return false
+  }
+  if (!isLoopbackHostname(hostUrl.hostname)) return false
+  if (req.headers['sec-fetch-site'] === 'cross-site') return false
+  const origin = req.headers.origin
+  if (typeof origin !== 'string') return true
+  try {
+    return new URL(origin).host === hostUrl.host
+  } catch {
+    return false
+  }
+}
+
+/** 未通过栅栏时统一的拒绝应答,和 dsh 的 /api 一样是裸 403,不泄露路由细节 */
+function refuse(res) {
+  res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' })
+  res.end('forbidden')
+}
+
 /**
  * @param {import('@deepseek-ai/cordis').Context} ctx
  * @param {{hostBinary?: string, pair?: boolean}} [config]
@@ -106,7 +151,8 @@ function apply(ctx, config = {}) {
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
     path: CONFIG_DOCUMENT_PATH,
-    handler: async (_req, res) => {
+    handler: async (req, res) => {
+      if (!isTrustedRequest(req)) return refuse(res)
       const path = await ctx.settings.prepareDocument()
       if (path === undefined) {
         res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' })
@@ -134,7 +180,8 @@ function apply(ctx, config = {}) {
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
     path: PAIRING_PATH,
-    handler: async (_req, res) => {
+    handler: async (req, res) => {
+      if (!isTrustedRequest(req)) return refuse(res)
       const result = await new Promise((resolve) => {
         pendingPairing = resolve
         send({ type: 'pairing-begin' })

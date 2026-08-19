@@ -36,6 +36,8 @@ Approvals are answered by DSH's own web UI on your phone — this plugin deliber
 - An unpaired peer cannot reach the proxy: proxy streams are only served on a connection that already completed the control-stream handshake, and an unpaired connection may send at most 512 bytes before being rejected.
 - Traffic is end-to-end encrypted by iroh (QUIC/TLS) and, when hole-punching succeeds, never touches a third party. The fallback relay carries only ciphertext it cannot read.
 - The app permits cleartext HTTP to `127.0.0.1` only — that is the local end of the tunnel, not the network.
+- The plugin's own two routes (view the config document, mint a pairing code on demand) apply the same browser-trust rules dsh applies to `/api`: the `Host` must be a loopback authority, an explicit cross-site marker is refused, and an attached `Origin` must match the Host. Cross-site requests from a malicious page and DNS-rebinding attempts both get a 403.
+- **Known limit**: those rules stop a browser from being used as a confused deputy; they do **not** stop a local process. A local `curl` presents a loopback `Host`, so it can mint a pairing code and pair itself as a "phone" — meaning **an attacker who can already run code on your dev machine can turn that into long-term access**. Closing it requires printing the code to the terminal only, never returning it over HTTP; that trade was not made so the desktop side can offer copy-to-clipboard. Don't run this plugin on a machine where you run untrusted code.
 
 ## Install
 
