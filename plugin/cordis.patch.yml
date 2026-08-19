@@ -1,4 +1,21 @@
-# 把 mobile-remote 审批 answerer 插入组合;spike 阶段经 dsh --patch 显式应用
+# 手机客户端的组合层。
 - insert:
     - id: mobile-remote
       name: dsh-plugin-mobile-remote
+    # 目录选择器换成「应用内浏览」后端(下面同时停掉默认的自动选择器)。
+    # 两半都要挂:host 半边提供 ctx.directoryPicker,client 半边填 ui-workspace
+    # 的目录流插槽;只挂 host 半边的话侧栏「添加工作区」按钮会整个消失。
+    - id: directory-picker-browse
+      name: '@deepseek-ai/dsh-host-directory-picker-browse'
+    - id: directory-picker-browse-client
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
+
+# 默认的 -auto 在启动时一次性判定:看到 loopback 绑定 + 有显示会话就选 -native,
+# 于是「添加工作区」在电脑上弹出系统对话框,手机端什么也看不到、也点不了。
+# 手机经隧道出口访问,来源正是 127.0.0.1,必然命中这条误判——上游文档把这种
+# 「经转发从本机地址进来」的情形列为已知限制,并指明直接组合 -browse 是解法。
+# 选择器与后端同时挂会因 directoryPicker 服务重复而 fail loud,故必须停掉它。
+# name 在 patch 里是断言不是覆盖:不匹配则整条跳过,正好用来防上游换实现时静默错配。
+- id: directory-picker
+  name: '@deepseek-ai/dsh-host-directory-picker-auto'
+  disabled: true
