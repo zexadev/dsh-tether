@@ -154,6 +154,14 @@ input::placeholder { color: var(--muted); }
 }
 .host-pick:active { opacity: 0.72; }
 .host-name { font-size: 14px; }
+.host-rename {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+  padding: 9px 12px;
+  font-size: 16px;
+}
+.btn-slim-quiet { background: transparent; }
 .host-meta {
   font-size: 11px;
   color: var(--muted);

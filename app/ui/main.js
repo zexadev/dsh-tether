@@ -82,12 +82,60 @@ function hostName(id) {
   return host === undefined ? '' : (host.label || shortId(host.id))
 }
 
+/** 行内模式:'view' 浏览 / 'rename' 改名 / 'confirm' 确认删除 */
+const rowMode = new Map()
+
+function showHostsError(e) {
+  const box = el('hosts-error')
+  box.textContent = String(e)
+  box.classList.remove('hidden')
+}
+
+async function runHostAction(promise) {
+  try {
+    book = await promise
+    el('hosts-error').classList.add('hidden')
+  } catch (e) {
+    showHostsError(e)
+  }
+  renderHosts()
+  if (live) showConnectedLabel()
+}
+
+function slimButton(text, onClick, quiet) {
+  const b = document.createElement('button')
+  b.className = 'btn btn-slim' + (quiet ? ' btn-slim-quiet' : '')
+  b.textContent = text
+  b.addEventListener('click', onClick)
+  return b
+}
+
 function renderHosts() {
   const list = el('host-list')
   list.replaceChildren()
   for (const host of book.hosts) {
+    const mode = rowMode.get(host.id) ?? 'view'
     const li = document.createElement('li')
     li.className = 'host-item'
+
+    if (mode === 'rename') {
+      const input = document.createElement('input')
+      input.className = 'host-rename'
+      input.value = host.label
+      input.placeholder = '给这台主机起个名字'
+      const save = () => {
+        rowMode.delete(host.id)
+        runHostAction(invoke('rename_host', { id: host.id, label: input.value }))
+      }
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save() })
+      li.append(input, slimButton('保存', save), slimButton('取消', () => {
+        rowMode.delete(host.id)
+        renderHosts()
+      }, true))
+      list.append(li)
+      input.focus()
+      continue
+    }
 
     const main = document.createElement('button')
     main.className = 'host-pick'
@@ -96,42 +144,55 @@ function renderHosts() {
     name.textContent = host.label || shortId(host.id)
     const meta = document.createElement('span')
     meta.className = 'host-meta'
-    meta.textContent = host.id === book.current ? `${shortId(host.id)} · 上次使用` : shortId(host.id)
+    meta.textContent = mode === 'confirm'
+      ? '删除后需要重新配对才能连回来'
+      : (host.id === book.current ? `${shortId(host.id)} · 上次使用` : shortId(host.id))
     main.append(name, meta)
-    main.addEventListener('click', () => { startConnect(host.id) })
+    if (mode === 'view') main.addEventListener('click', () => { startConnect(host.id) })
+    li.append(main)
 
-    const del = document.createElement('button')
-    del.className = 'btn btn-slim'
-    del.textContent = '删除'
-    del.addEventListener('click', async () => {
-      try {
-        book = await invoke('forget_host', { id: host.id })
+    if (mode === 'confirm') {
+      li.append(slimButton('确认删除', () => {
+        rowMode.delete(host.id)
+        runHostAction(invoke('forget_host', { id: host.id }))
+      }), slimButton('取消', () => {
+        rowMode.delete(host.id)
         renderHosts()
-      } catch (e) {
-        el('hosts-error').textContent = String(e)
-        el('hosts-error').classList.remove('hidden')
-      }
-    })
-
-    li.append(main, del)
+      }, true))
+    } else {
+      li.append(slimButton('改名', () => {
+        rowMode.set(host.id, 'rename')
+        renderHosts()
+      }, true), slimButton('删除', () => {
+        rowMode.set(host.id, 'confirm')
+        renderHosts()
+      }, true))
+    }
     list.append(li)
   }
   el('hosts-empty').classList.toggle('hidden', book.hosts.length > 0)
 }
 
+/** 顶栏的「已连接 · X」;改名后要跟着变,所以单独一处 */
+function showConnectedLabel() {
+  const n = hostName(connectingTo)
+  setStatus('connected', n ? `已连接 · ${n}` : '已连接')
+}
+
 async function refreshHosts() {
   book = await invoke('list_hosts')
   renderHosts()
+  if (live) showConnectedLabel()
 }
 
 // —— 连接状态 ——
 
 function onState({ status, detail }) {
   if (status === 'connected') {
-    const named = (id) => { const n = hostName(id); setStatus('connected', n ? `已连接 · ${n}` : '已连接') }
-    named(connectingTo)
+    live = true
+    showConnectedLabel()
     // 刚配对完的主机还不在本地簿里,取回来补上名字
-    if (hostName(connectingTo) === '') refreshHosts().then(() => named(connectingTo)).catch(() => {})
+    if (hostName(connectingTo) === '') refreshHosts().catch(() => {})
     el('reconnect-row').classList.add('hidden')
   } else if (status === 'connecting') {
     const n = hostName(connectingTo)

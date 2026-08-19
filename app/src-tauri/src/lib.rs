@@ -239,6 +239,18 @@ fn list_hosts(app: AppHandle) -> HostBook {
     load_book(&app)
 }
 
+/// 给已保存的主机改名。凭证不变,只动本地显示名。
+#[tauri::command]
+fn rename_host(app: AppHandle, id: String, label: String) -> Result<HostBook, String> {
+    let mut book = load_book(&app);
+    let Some(host) = book.hosts.iter_mut().find(|h| h.id == id) else {
+        return Err("这台主机不在已保存列表里".into());
+    };
+    host.label = label.trim().to_string();
+    save_book(&app, &book).map_err(|e| format!("{e:#}"))?;
+    Ok(book)
+}
+
 #[tauri::command]
 fn forget_host(app: AppHandle, id: String) -> Result<HostBook, String> {
     let mut book = load_book(&app);
@@ -299,7 +311,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .manage(AppState::default())
-        .invoke_handler(tauri::generate_handler![list_hosts, forget_host, pair, connect])
+        .invoke_handler(tauri::generate_handler![list_hosts, rename_host, forget_host, pair, connect])
         .run(tauri::generate_context!())
         .expect("tauri 启动失败");
 }
