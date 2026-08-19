@@ -30,7 +30,13 @@
   }
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  /* 安卓 WebView 触摸时会按 DOM 盒子刷一块方角蓝底,盖掉圆角也盖掉自定义按下态 */
+  -webkit-tap-highlight-color: transparent;
+}
 
 html, body { height: 100%; }
 body {

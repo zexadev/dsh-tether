@@ -191,9 +191,9 @@ function injectNarrowScreenCss(html) {
     [class*="_frame"]::after { transition: none; }
   }
 
-  /* 「打开配置文件」在宿主机桌面开编辑器,手机上按了什么也看不到——和目录
-     选择器是同一类问题。手机上不给这个入口。 */
-  [role="dialog"][aria-modal="true"] [class*="_actions"] { display: none !important; }
+  /* 触摸时安卓 WebView 会按元素的 DOM 盒子刷一块蓝色高亮,方角、盖住圆角,
+     和 dsh 自己的按下态叠在一起很脏。关掉它,按下反馈交给页面自己的样式。 */
+  * { -webkit-tap-highlight-color: transparent; }
 
   /* 竖排之后,内容区自带的头部(关闭键)会落到标签栏下方、屏幕
      正中,很别扭。钉到弹窗右上角,与标题同一行——手机弹窗关闭键就该在那儿。 */
