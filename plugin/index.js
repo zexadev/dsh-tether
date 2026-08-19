@@ -149,33 +149,47 @@ function injectNarrowScreenCss(html) {
      140px。改成抽屉:网格保持收起时的列宽,侧栏浮到内容之上盖住一部分。
      展开态没有专门的类名,但展开才会出现拖拽把手,用它作状态信号。
      把手本身在手机上没用(没法拖),隐掉。 */
-  [class*="_frame"]:has(> [class*="_handle"]) {
+  /* 网格恒定为收起时的列宽,侧栏恒定绝对定位、只让宽度随展开态变化——
+     position 不可过渡,只有始终 absolute 才能做出滑入滑出的动画。
+     侧栏脱离文档流后剩下的子元素会整体上移一列(对话区掉进 56px 那列,
+     反而更窄),所以显式钉住列号。 */
+  [class*="_frame"] {
     grid-template-columns: 56px minmax(0, 1fr) 0px !important;
   }
-  /* 侧栏脱离文档流后,剩下的子元素会整体上移一列(对话区掉进 56px 那列,
-     反而更窄)。显式钉住列号。 */
-  [class*="_frame"]:has(> [class*="_handle"]) > [class*="centerCol"] { grid-column: 2 !important; }
-  [class*="_frame"]:has(> [class*="_handle"]) > [class*="detailsCol"] { grid-column: 3 !important; }
-  [class*="_frame"]:has(> [class*="_handle"]) > [class*="sidebarCol"] {
+  [class*="_frame"] > [class*="centerCol"] { grid-column: 2 !important; }
+  [class*="_frame"] > [class*="detailsCol"] { grid-column: 3 !important; }
+  [class*="_frame"] > [class*="sidebarCol"] {
     position: absolute !important;
     top: 0;
     bottom: 0;
     left: 0;
-    width: min(300px, 84vw) !important;
+    width: 56px !important;
     z-index: 30 !important;
+    transition: width 220ms ease, box-shadow 220ms ease;
+  }
+  /* 展开态没有专门的类名,但展开才会出现拖拽把手,用它作状态信号 */
+  [class*="_frame"]:has(> [class*="_handle"]) > [class*="sidebarCol"] {
+    width: min(300px, 84vw) !important;
     box-shadow: 0 10px 36px rgba(0, 0, 0, 0.24);
   }
-  /* 抽屉下的内容压暗,提示焦点在抽屉上;不拦指针,免得没有脚本关不掉抽屉时
-     整个页面都点不动。 */
-  [class*="_frame"]:has(> [class*="_handle"])::after {
+  /* 抽屉下的内容压暗。指针不拦——收起由注入的脚本接管,拦了反而会在脚本
+     未生效时把整页点死。 */
+  [class*="_frame"]::after {
     content: '';
     position: absolute;
     inset: 0;
     z-index: 25;
     background: rgba(0, 0, 0, 0.28);
+    opacity: 0;
     pointer-events: none;
+    transition: opacity 220ms ease;
   }
+  [class*="_frame"]:has(> [class*="_handle"])::after { opacity: 1; }
   [class*="_frame"] > [class*="_handle"] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    [class*="_frame"] > [class*="sidebarCol"],
+    [class*="_frame"]::after { transition: none; }
+  }
 
   /* 「打开配置文件」在宿主机桌面开编辑器,手机上按了什么也看不到——和目录
      选择器是同一类问题。手机上不给这个入口。 */
@@ -194,7 +208,29 @@ function injectNarrowScreenCss(html) {
     z-index: 2;
   }
 }`
-  return html.replace('</head>', `<style data-dsh-remote="narrow-screen">${css}\n</style></head>`)
+  // 抽屉遮罩只是画上去的,点它不会收起——那需要脚本。这段只做这一件事:
+  // 窄屏下点到抽屉外面就替用户按一次侧栏开关。
+  const script = `
+(function () {
+  var narrow = window.matchMedia('(max-width: 640px)')
+  document.addEventListener('pointerdown', function (event) {
+    if (!narrow.matches) return
+    var frame = document.querySelector('[class*="_frame"]')
+    if (!frame || !frame.querySelector(':scope > [class*="_handle"]')) return
+    var drawer = frame.querySelector(':scope > [class*="sidebarCol"]')
+    if (!drawer || drawer.contains(event.target)) return
+    var toggle = document.querySelector('button[aria-label*="侧边栏"], button[aria-label*="sidebar" i]')
+    if (!toggle) return
+    // 这一下只用来收抽屉,不该顺带点到底下的东西
+    event.preventDefault()
+    event.stopPropagation()
+    toggle.click()
+  }, true)
+})()`
+  return html.replace(
+    '</head>',
+    `<style data-dsh-remote="narrow-screen">${css}\n</style><script data-dsh-remote="narrow-screen">${script}\n</script></head>`,
+  )
 }
 
 function defaultHostBinary() {

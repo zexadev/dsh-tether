@@ -127,6 +127,33 @@ input::placeholder { color: var(--muted); }
 
 .error { color: var(--danger); font-size: 12px; margin: 0 0 12px; }
 
+.host-list { list-style: none; margin-bottom: 8px; }
+.host-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.host-pick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--fill-soft);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.host-pick:active { opacity: 0.72; }
+.host-name { font-size: 14px; }
+.host-meta {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .webui {
   flex: 1;
   width: 100%;

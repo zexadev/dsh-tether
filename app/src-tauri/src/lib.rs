@@ -22,10 +22,23 @@ struct AppState {
     proxy_port: Mutex<Option<u16>>,
 }
 
-/// 已配对 host 的持久记录
+/// 一台已配对主机
 #[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct HostRecord {
     id: String,
+    /// 配对时用户给这台主机起的名字;空则前端显示 ID 前缀
+    #[serde(default)]
+    label: String,
+}
+
+/// 手机侧的主机簿:配过的都留着,不必为换一台重填凭证
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct HostBook {
+    hosts: Vec<HostRecord>,
+    /// 上次连的那台,下次打开直接用
+    current: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -47,8 +60,36 @@ fn data_dir(app: &AppHandle) -> Result<PathBuf> {
     app.path().app_data_dir().context("取不到应用数据目录")
 }
 
-fn host_record_path(app: &AppHandle) -> Result<PathBuf> {
-    Ok(data_dir(app)?.join("host.json"))
+fn host_book_path(app: &AppHandle) -> Result<PathBuf> {
+    Ok(data_dir(app)?.join("hosts.json"))
+}
+
+fn load_book(app: &AppHandle) -> HostBook {
+    let Ok(path) = host_book_path(app) else { return HostBook::default() };
+    if let Ok(bytes) = std::fs::read(&path) {
+        if let Ok(book) = serde_json::from_slice::<HostBook>(&bytes) {
+            return book
+        }
+    }
+    // 单主机时代的 host.json:读一次迁移过来,免得老用户要重新配对
+    let Ok(dir) = data_dir(app) else { return HostBook::default() };
+    let legacy = dir.join("host.json");
+    let Ok(bytes) = std::fs::read(&legacy) else { return HostBook::default() };
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else { return HostBook::default() };
+    let Some(id) = value.get("id").and_then(|v| v.as_str()) else { return HostBook::default() };
+    HostBook {
+        hosts: vec![HostRecord { id: id.to_string(), label: String::new() }],
+        current: Some(id.to_string()),
+    }
+}
+
+fn save_book(app: &AppHandle, book: &HostBook) -> Result<()> {
+    let path = host_book_path(app)?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    std::fs::write(&path, serde_json::to_vec_pretty(book)?)?;
+    Ok(())
 }
 
 fn emit_state(app: &AppHandle, status: &'static str, detail: impl Into<String>) {
@@ -72,8 +113,8 @@ async fn get_or_init_endpoint(app: &AppHandle, state: &AppState) -> Result<Endpo
 
 /// 连接 actor:发首行(Pair 或 Hello),配对成功即持久化 host,
 /// 之后读侧转事件给前端、写侧从 mpsc 取决定,断开清理并广播状态。
-async fn run_connection(app: AppHandle, peer: EndpointId, first: Wire) {
-    if let Err(e) = run_connection_inner(&app, peer, first).await {
+async fn run_connection(app: AppHandle, peer: EndpointId, first: Wire, pair_label: Option<String>) {
+    if let Err(e) = run_connection_inner(&app, peer, first, pair_label).await {
         emit_state(&app, "disconnected", format!("{e:#}"));
     } else {
         emit_state(&app, "disconnected", "连接已断开");
@@ -82,7 +123,12 @@ async fn run_connection(app: AppHandle, peer: EndpointId, first: Wire) {
     *state.outgoing.lock().await = None;
 }
 
-async fn run_connection_inner(app: &AppHandle, peer: EndpointId, first: Wire) -> Result<()> {
+async fn run_connection_inner(
+    app: &AppHandle,
+    peer: EndpointId,
+    first: Wire,
+    pair_label: Option<String>,
+) -> Result<()> {
     emit_state(app, "connecting", "正在连接主机…");
     let state = app.state::<AppState>();
     let ep = get_or_init_endpoint(app, &state).await?;
@@ -100,11 +146,15 @@ async fn run_connection_inner(app: &AppHandle, peer: EndpointId, first: Wire) ->
             .context("配对被主机拒绝(配对码错误或窗口已关闭)")?;
         match serde_json::from_str::<Wire>(&resp)? {
             Wire::PairOk => {
-                let path = host_record_path(app)?;
-                if let Some(dir) = path.parent() {
-                    std::fs::create_dir_all(dir)?;
+                let id = peer.to_string();
+                let label = pair_label.unwrap_or_default();
+                let mut book = load_book(app);
+                match book.hosts.iter_mut().find(|h| h.id == id) {
+                    Some(existing) => existing.label = label,
+                    None => book.hosts.push(HostRecord { id: id.clone(), label }),
                 }
-                std::fs::write(&path, serde_json::to_vec(&HostRecord { id: peer.to_string() })?)?;
+                book.current = Some(id);
+                save_book(app, &book)?;
             }
             Wire::PairFail { reason } => bail!("配对失败: {reason}"),
             _ => bail!("配对应答不符合协议"),
@@ -185,32 +235,62 @@ fn parse_peer(peer: &str) -> Result<EndpointId, String> {
 }
 
 #[tauri::command]
-fn get_host(app: AppHandle) -> Option<String> {
-    let path = host_record_path(&app).ok()?;
-    let bytes = std::fs::read(path).ok()?;
-    serde_json::from_slice::<HostRecord>(&bytes).ok().map(|r| r.id)
+fn list_hosts(app: AppHandle) -> HostBook {
+    load_book(&app)
 }
 
 #[tauri::command]
-async fn pair(app: AppHandle, peer: String, code: String, name: String) -> Result<(), String> {
+fn forget_host(app: AppHandle, id: String) -> Result<HostBook, String> {
+    let mut book = load_book(&app);
+    book.hosts.retain(|h| h.id != id);
+    if book.current.as_deref() == Some(id.as_str()) {
+        book.current = book.hosts.first().map(|h| h.id.clone());
+    }
+    save_book(&app, &book).map_err(|e| format!("{e:#}"))?;
+    Ok(book)
+}
+
+#[tauri::command]
+async fn pair(
+    app: AppHandle,
+    peer: String,
+    code: String,
+    name: String,
+    label: String,
+) -> Result<(), String> {
     let peer = parse_peer(&peer)?;
     let code = code.trim().to_string();
     if code.len() != 6 || !code.chars().all(|c| c.is_ascii_digit()) {
         return Err("配对码应为 6 位数字".into());
     }
     let name = if name.trim().is_empty() { "我的手机".to_string() } else { name.trim().to_string() };
-    tauri::async_runtime::spawn(run_connection(app, peer, Wire::Pair { code, name }));
+    tauri::async_runtime::spawn(run_connection(
+        app,
+        peer,
+        Wire::Pair { code, name },
+        Some(label.trim().to_string()),
+    ));
     Ok(())
 }
 
+/// 连接指定主机;不给 id 就连上次那台。选定的会记为 current。
 #[tauri::command]
-async fn connect(app: AppHandle) -> Result<(), String> {
-    let Some(saved) = get_host(app.clone()) else {
-        return Err("尚未配对主机".into());
+async fn connect(app: AppHandle, id: Option<String>) -> Result<(), String> {
+    let mut book = load_book(&app);
+    let target = id.or_else(|| book.current.clone()).or_else(|| book.hosts.first().map(|h| h.id.clone()));
+    let Some(target) = target else {
+        return Err("还没有已保存的主机".into());
     };
-    let peer = parse_peer(&saved)?;
+    if !book.hosts.iter().any(|h| h.id == target) {
+        return Err("这台主机不在已保存列表里".into());
+    }
+    if book.current.as_deref() != Some(target.as_str()) {
+        book.current = Some(target.clone());
+        save_book(&app, &book).map_err(|e| format!("{e:#}"))?;
+    }
+    let peer = parse_peer(&target)?;
     let name = "我的手机".to_string();
-    tauri::async_runtime::spawn(run_connection(app, peer, Wire::Hello { name }));
+    tauri::async_runtime::spawn(run_connection(app, peer, Wire::Hello { name }, None));
     Ok(())
 }
 
@@ -219,7 +299,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .manage(AppState::default())
-        .invoke_handler(tauri::generate_handler![get_host, pair, connect])
+        .invoke_handler(tauri::generate_handler![list_hosts, forget_host, pair, connect])
         .run(tauri::generate_context!())
         .expect("tauri 启动失败");
 }
