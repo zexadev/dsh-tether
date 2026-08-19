@@ -42,9 +42,15 @@ enum Cmd {
         /// 启动即开配对窗口(默认仅在白名单为空时自动开)
         #[arg(long)]
         pair: bool,
+        /// 已配对设备的代理流转发目标(dsh web 地址);不配则拒绝代理流
+        #[arg(long)]
+        proxy_target: Option<std::net::SocketAddr>,
     },
     /// 手机端替身:连接 host,打印审批请求并按策略应答
     PhoneSim {
+        /// 本地起代理监听,经 host 的代理流访问其 dsh web(如 127.0.0.1:17380)
+        #[arg(long)]
+        proxy_listen: Option<std::net::SocketAddr>,
         /// host 的设备 ID
         #[arg(long)]
         peer: String,
@@ -126,10 +132,12 @@ async fn main() -> Result<()> {
             let secret = load_or_create_secret(&dir.join("identity.key"))?;
             println!("{}", secret.public());
         }
-        Cmd::Host { data_dir, pair } => host_main(data_dir.unwrap_or_else(default_data_dir), pair).await?,
-        Cmd::PhoneSim { peer, code, name, auto, delay, data_dir } => {
+        Cmd::Host { data_dir, pair, proxy_target } => {
+            host_main(data_dir.unwrap_or_else(default_data_dir), pair, proxy_target).await?
+        }
+        Cmd::PhoneSim { proxy_listen, peer, code, name, auto, delay, data_dir } => {
             let dir = data_dir.unwrap_or_else(|| default_data_dir_named("dsh-remote-phone-sim"));
-            phone_sim_main(dir, peer, code, name, auto, delay).await?
+            phone_sim_main(dir, peer, code, name, auto, delay, proxy_listen).await?
         }
     }
     Ok(())
@@ -168,7 +176,7 @@ fn emit(msg: &PluginOut) {
     println!("{}", serde_json::to_string(msg).expect("PluginOut 可序列化"));
 }
 
-async fn host_main(data_dir: PathBuf, force_pair: bool) -> Result<()> {
+async fn host_main(data_dir: PathBuf, force_pair: bool, proxy_target: Option<std::net::SocketAddr>) -> Result<()> {
     let secret = load_or_create_secret(&data_dir.join("identity.key"))?;
     let store_path = data_dir.join("paired.json");
     let store = load_store(&store_path);
@@ -198,7 +206,7 @@ async fn host_main(data_dir: PathBuf, force_pair: bool) -> Result<()> {
                 let Some(incoming) = incoming else { break };
                 let state = state.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = handle_phone(incoming, state).await {
+                    if let Err(e) = handle_phone(incoming, state, proxy_target).await {
                         eprintln!("[host] 入站连接处理失败: {e:#}");
                     }
                 });
@@ -245,7 +253,11 @@ async fn broadcast(state: &Arc<Mutex<HostState>>, line: String) {
     }
 }
 
-async fn handle_phone(incoming: iroh::endpoint::Incoming, state: Arc<Mutex<HostState>>) -> Result<()> {
+async fn handle_phone(
+    incoming: iroh::endpoint::Incoming,
+    state: Arc<Mutex<HostState>>,
+    proxy_target: Option<std::net::SocketAddr>,
+) -> Result<()> {
     let conn = incoming.await.context("接受连接失败")?;
     let remote = conn.remote_id().to_string();
     let paired = { state.lock().await.store.devices.iter().any(|d| d.id == remote) };
@@ -336,7 +348,32 @@ async fn handle_phone(incoming: iroh::endpoint::Incoming, state: Arc<Mutex<HostS
             }
         }
     };
-    tokio::join!(writer, reader);
+    // 控制流建立(已配对)后,同一连接的后续 bi 流是代理流:首行 {"type":"proxy"},
+    // 之后整条流拼原始字节到 proxy_target(dsh web)。连接断开 accept_bi 报错,循环自然结束。
+    let proxy_acceptor = async {
+        let permits = Arc::new(tokio::sync::Semaphore::new(64));
+        while let Ok((mut psend, mut precv)) = conn.accept_bi().await {
+            let Some(target) = proxy_target else {
+                eprintln!("[host] 未配置 --proxy-target,拒绝代理流");
+                continue;
+            };
+            let permit = permits.clone().acquire_owned().await.expect("semaphore 不会关闭");
+            tokio::spawn(async move {
+                let _permit = permit;
+                match read_line_bounded(&mut precv, 256).await.map(|l| serde_json::from_str::<Wire>(&l)) {
+                    Ok(Ok(Wire::Proxy)) => {}
+                    _ => return,
+                }
+                let Ok(mut tcp) = tokio::net::TcpStream::connect(target).await else {
+                    eprintln!("[host] 代理流无法连接 {target}(dsh web 未启动?)");
+                    return;
+                };
+                let mut stream = tokio::io::join(precv, psend);
+                let _ = tokio::io::copy_bidirectional(&mut tcp, &mut stream).await;
+            });
+        }
+    };
+    tokio::join!(writer, reader, proxy_acceptor);
 
     {
         let mut s = state.lock().await;
@@ -362,6 +399,7 @@ async fn phone_sim_main(
     name: String,
     auto: String,
     delay: u64,
+    proxy_listen: Option<std::net::SocketAddr>,
 ) -> Result<()> {
     let peer: EndpointId = peer.trim().parse().map_err(|e| anyhow::anyhow!("无效的 --peer 设备 ID: {e}"))?;
     let secret = load_or_create_secret(&data_dir.join("identity.key"))?;
@@ -384,6 +422,28 @@ async fn phone_sim_main(
         }
     }
     eprintln!("[phone-sim] 已连接,应答策略 {auto}(延迟 {delay}ms),等待审批请求…");
+
+    if let Some(listen) = proxy_listen {
+        let listener = tokio::net::TcpListener::bind(listen)
+            .await
+            .with_context(|| format!("本地代理监听失败: {listen}"))?;
+        eprintln!("[phone-sim] 代理就绪: http://{listen} → [iroh] → host 的 dsh web");
+        let pconn = conn.clone();
+        tokio::spawn(async move {
+            loop {
+                let Ok((mut tcp, _)) = listener.accept().await else { break };
+                let conn = pconn.clone();
+                tokio::spawn(async move {
+                    let Ok((mut psend, precv)) = conn.open_bi().await else { return };
+                    if write_line(&mut psend, &serde_json::to_string(&Wire::Proxy).expect("Wire 可序列化")).await.is_err() {
+                        return;
+                    }
+                    let mut stream = tokio::io::join(precv, psend);
+                    let _ = tokio::io::copy_bidirectional(&mut tcp, &mut stream).await;
+                });
+            }
+        });
+    }
 
     loop {
         let line = tokio::select! {

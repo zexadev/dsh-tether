@@ -18,9 +18,11 @@ pub const MAX_UNPAIRED_LINE: usize = 512;
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Wire {
-    // 手机 → host(首行二选一)
+    // 手机 → host(连接首条控制流的首行,二选一)
     Hello { name: String },
     Pair { code: String, name: String },
+    // 手机 → host(后续代理流的首行;此行之后整条流是原始 TCP 字节)
+    Proxy,
     // host → 手机(配对应答)
     PairOk,
     PairFail { reason: String },
