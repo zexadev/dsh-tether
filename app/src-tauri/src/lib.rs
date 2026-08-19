@@ -10,7 +10,7 @@ use iroh::endpoint::presets;
 use iroh::{Endpoint, EndpointId};
 use remote_core::{load_or_create_secret, read_line_bounded, write_line, Wire, ALPN, MAX_LINE};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, Mutex};
 
 #[derive(Default)]
@@ -18,6 +18,8 @@ struct AppState {
     ep: Mutex<Option<Endpoint>>,
     /// 在线连接的决定发送端;None = 未连接
     outgoing: Mutex<Option<mpsc::Sender<Wire>>>,
+    /// 本地代理监听端口;WebView 指向它即拿到主机的完整 dsh web UI
+    proxy_port: Mutex<Option<u16>>,
 }
 
 /// 已配对 host 的持久记录
@@ -111,6 +113,16 @@ async fn run_connection_inner(app: &AppHandle, peer: EndpointId, first: Wire) ->
 
     let (tx, mut rx) = mpsc::channel::<Wire>(16);
     *state.outgoing.lock().await = Some(tx);
+
+    // 本地代理:每条入站 TCP 对应一条 iroh 代理流,WebView 由此拿到主机的完整
+    // dsh web UI。端口交给 OS 分配,避免与手机上其它应用抢固定端口。
+    match start_proxy(app.clone(), conn.clone()).await {
+        Ok(port) => {
+            *state.proxy_port.lock().await = Some(port);
+            let _ = app.emit("remote:proxy-ready", serde_json::json!({ "url": format!("http://127.0.0.1:{port}/") }));
+        }
+        Err(e) => emit_state(app, "connecting", format!("代理启动失败: {e:#}")),
+    }
     emit_state(app, "connected", "已连接");
 
     let writer = async {
@@ -140,6 +152,32 @@ async fn run_connection_inner(app: &AppHandle, peer: EndpointId, first: Wire) ->
     };
     tokio::join!(writer, reader);
     Ok(())
+}
+
+/// 起本地 TCP 监听,每条连接开一条 iroh 代理流转发;返回 OS 分配的端口。
+/// 监听任务随连接生命周期结束:连接断开后 open_bi 失败,浏览器侧表现为加载失败。
+async fn start_proxy(app: AppHandle, conn: iroh::endpoint::Connection) -> Result<u16> {
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .context("本地代理监听失败")?;
+    let port = listener.local_addr()?.port();
+    tauri::async_runtime::spawn(async move {
+        let _keep_app_alive = app;
+        loop {
+            let Ok((mut tcp, _)) = listener.accept().await else { break };
+            let conn = conn.clone();
+            tauri::async_runtime::spawn(async move {
+                let Ok((mut send, recv)) = conn.open_bi().await else { return };
+                let line = serde_json::to_string(&Wire::Proxy).expect("Wire 可序列化");
+                if write_line(&mut send, &line).await.is_err() {
+                    return;
+                }
+                let mut stream = tokio::io::join(recv, send);
+                let _ = tokio::io::copy_bidirectional(&mut tcp, &mut stream).await;
+            });
+        }
+    });
+    Ok(port)
 }
 
 fn parse_peer(peer: &str) -> Result<EndpointId, String> {
@@ -176,23 +214,12 @@ async fn connect(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-async fn decide(state: State<'_, AppState>, id: String, allow: bool) -> Result<(), String> {
-    let outcome = if allow { "allowed-once" } else { "rejected" };
-    let guard = state.outgoing.lock().await;
-    let Some(tx) = guard.as_ref() else {
-        return Err("当前未连接主机".into());
-    };
-    tx.send(Wire::Decision { id, outcome: outcome.into() })
-        .await
-        .map_err(|_| "连接已断开".to_string())
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .manage(AppState::default())
-        .invoke_handler(tauri::generate_handler![get_host, pair, connect, decide])
+        .invoke_handler(tauri::generate_handler![get_host, pair, connect])
         .run(tauri::generate_context!())
         .expect("tauri 启动失败");
 }

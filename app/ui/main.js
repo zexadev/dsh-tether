@@ -1,11 +1,22 @@
 const { invoke } = window.__TAURI__.core
 const { listen } = window.__TAURI__.event
+const notification = window.__TAURI__.notification
 
 const el = (id) => document.getElementById(id)
 const views = { pair: el('view-pair'), main: el('view-main') }
 
 function showView(name) {
   for (const [k, v] of Object.entries(views)) v.classList.toggle('hidden', k !== name)
+  el('webui').classList.add('hidden')
+}
+
+// 主机的完整 dsh web UI:代理就绪后 iframe 指过去,本页只留顶部状态条
+function showWebUi(url) {
+  const frame = el('webui')
+  if (frame.src !== url) frame.src = url
+  views.pair.classList.add('hidden')
+  views.main.classList.add('hidden')
+  frame.classList.remove('hidden')
 }
 
 function setStatus(status, text) {
@@ -14,58 +25,24 @@ function setStatus(status, text) {
   el('status-text').textContent = text
 }
 
-// —— 审批卡片 ——
+// —— 待审批通知 ——
+// 审批本身在上面那个 web UI 里点(它就是 dsh 自己的界面)。通知只负责把
+// 「agent 卡住了」这件事送到锁屏——人不看手机就不知道,这是移动端不可替代的部分。
 
-const cards = el('cards')
+let notifyAllowed = false
 
-function refreshEmpty() {
-  el('empty').classList.toggle('hidden', cards.children.length > 0)
+async function ensureNotifyPermission() {
+  if (notification === undefined) return
+  notifyAllowed = await notification.isPermissionGranted()
+  if (!notifyAllowed) notifyAllowed = (await notification.requestPermission()) === 'granted'
 }
 
-function addCard({ id, toolName, reason }) {
-  if (document.getElementById('card-' + id)) return
-  const card = document.createElement('div')
-  card.className = 'card'
-  card.id = 'card-' + id
-
-  const tool = document.createElement('span')
-  tool.className = 'tool'
-  tool.textContent = toolName || '未知操作'
-
-  const text = document.createElement('p')
-  text.className = 'reason'
-  text.textContent = reason || '(无说明)'
-
-  const actions = document.createElement('div')
-  actions.className = 'actions'
-  const reject = document.createElement('button')
-  reject.className = 'btn btn-danger'
-  reject.textContent = '拒绝'
-  const approve = document.createElement('button')
-  approve.className = 'btn'
-  approve.textContent = '批准'
-  const decide = async (allow) => {
-    reject.disabled = approve.disabled = true
-    try {
-      await invoke('decide', { id, allow })
-      removeCard(id)
-    } catch (e) {
-      reject.disabled = approve.disabled = false
-      setStatus('disconnected', String(e))
-    }
-  }
-  reject.addEventListener('click', () => decide(false))
-  approve.addEventListener('click', () => decide(true))
-  actions.append(reject, approve)
-
-  card.append(tool, text, actions)
-  cards.prepend(card)
-  refreshEmpty()
-}
-
-function removeCard(id) {
-  document.getElementById('card-' + id)?.remove()
-  refreshEmpty()
+function notifyApproval({ toolName, reason }) {
+  if (!notifyAllowed) return
+  notification.sendNotification({
+    title: `等待你批准:${toolName || '一个操作'}`,
+    body: reason || '打开 DSH Remote 查看并批准',
+  })
 }
 
 // —— 连接状态 ——
@@ -77,17 +54,17 @@ function onState({ status, detail }) {
     paired = true
     setStatus('connected', '已连接')
     el('reconnect-row').classList.add('hidden')
-    showView('main')
   } else if (status === 'connecting') {
     setStatus('connecting', '连接中…')
   } else {
     setStatus('disconnected', '未连接')
-    cards.replaceChildren()
-    refreshEmpty()
+    el('webui').removeAttribute('src')
     if (paired) {
+      showView('main')
       el('reconnect-text').textContent = detail
       el('reconnect-row').classList.remove('hidden')
     } else {
+      showView('pair')
       const err = el('pair-error')
       err.textContent = detail
       err.classList.remove('hidden')
@@ -129,17 +106,24 @@ el('reconnect').addEventListener('click', () => {
   invoke('connect').catch((e) => onState({ status: 'disconnected', detail: String(e) }))
 })
 
+// 回前台即重连:Android 会在后台掐掉网络,回来时旧连接多半已死
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && paired && el('webui').classList.contains('hidden')) {
+    invoke('connect').catch(() => {})
+  }
+})
+
 // —— 启动 ——
 
 async function boot() {
   await listen('remote:state', (e) => onState(e.payload))
-  await listen('remote:approval', (e) => addCard(e.payload))
-  await listen('remote:approval-cancel', (e) => removeCard(e.payload.id))
+  await listen('remote:proxy-ready', (e) => showWebUi(e.payload.url))
+  await listen('remote:approval', (e) => notifyApproval(e.payload))
+  await ensureNotifyPermission()
   const host = await invoke('get_host')
   if (host) {
     paired = true
     showView('main')
-    refreshEmpty()
     invoke('connect').catch((e) => onState({ status: 'disconnected', detail: String(e) }))
   } else {
     showView('pair')

@@ -115,6 +115,13 @@ input:focus { border-color: var(--accent); }
 .card .actions { display: flex; gap: 10px; }
 .card .actions .btn { flex: 1; }
 
+.webui {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: var(--card);
+}
+
 .empty {
   color: var(--muted);
   font-size: 14px;
