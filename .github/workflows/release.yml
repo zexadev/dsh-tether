@@ -1,0 +1,114 @@
+## 发布流水线:打 tag 时构建各平台 sidecar 与 APK,汇总进一个 Release。
+## sidecar 必须在各自的目标系统上原生构建——Windows 编不出 macOS,
+## 而 tether-host 依赖 iroh 的原生加密后端,交叉编译得不偿失。
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  host:
+    name: sidecar ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: win32-x64, os: windows-latest, target: x86_64-pc-windows-msvc }
+          - { name: darwin-arm64, os: macos-latest, target: aarch64-apple-darwin }
+          - { name: darwin-x64, os: macos-13, target: x86_64-apple-darwin }
+          - { name: linux-x64, os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - run: cargo build --release -p tether-host --target ${{ matrix.target }}
+      - run: node scripts/pack-host.mjs --target ${{ matrix.target }}
+      # 平台子包整个上传:里面既有二进制,也有 npm publish 需要的 manifest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: host-${{ matrix.name }}
+          path: packages/host-${{ matrix.name }}/
+          if-no-files-found: error
+
+  # release 版 APK 必须签名才装得上,而签名密钥是长期身份:丢了就没法给已安装的
+  # 用户推更新。所以这一步由仓库变量 ANDROID_SIGNING=enabled 显式打开,密钥齐了
+  # 再开——否则宁可不产出,也不要往 Release 里放一个装不上的包。
+  apk:
+    name: android apk
+    runs-on: ubuntu-latest
+    if: vars.ANDROID_SIGNING == 'enabled'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - uses: android-actions/setup-android@v3
+      - name: 装 NDK
+        run: |
+          sdkmanager --install "ndk;27.0.12077973"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+      - run: pnpm install
+        working-directory: app
+      - name: 落签名配置
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cd app/src-tauri/gen/android
+          echo "$KEYSTORE_B64" | base64 -d > keystore.jks
+          cat > keystore.properties <<EOF
+          storeFile=$(pwd)/keystore.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          password=$KEY_PASSWORD
+          EOF
+      - run: pnpm exec tauri android build --apk --target aarch64
+        working-directory: app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: app/src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk
+          if-no-files-found: error
+
+  release:
+    name: 汇总发布
+    needs: [host, apk]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist }
+      # 平台子包打成 tgz 挂在 Release 上;npm publish 需要 token,留给人工决定何时发
+      - name: 打包平台子包
+        run: |
+          mkdir -p upload
+          for d in dist/host-*/; do
+            (cd "$d" && npm pack --pack-destination "$GITHUB_WORKSPACE/upload")
+          done
+          find dist -name '*.apk' -exec cp {} upload/ \;
+          ls -la upload/
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: upload/*
+          generate_release_notes: true

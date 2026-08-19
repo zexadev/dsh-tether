@@ -1,0 +1,30 @@
+## 每次推送的最低限度自检:能编译、脚本语法没坏。
+## 真正的验收靠真机(见 README 实测表),CI 只保证 main 不是坏的。
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # app 是 Tauri 桌面壳,Linux 上要 GTK/WebKit 才编得动
+      - name: 装 Tauri 的 Linux 依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - run: cargo build --workspace
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: 插件与前端语法自检
+        run: |
+          node --check index.js
+          node --check app/ui/main.js
+          node --check scripts/pack-host.mjs
