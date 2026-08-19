@@ -219,6 +219,10 @@ function injectNarrowScreenCss(html) {
   }
   [class*="_frame"]:has(> [class*="_handle"])::after { opacity: 1; }
   [class*="_frame"] > [class*="_handle"] { display: none !important; }
+
+  /* 侧栏收起时是图标条,「主机」按钮的文字跟着藏起来,和 dsh 自己的按钮一致 */
+  [data-dsh-remote="hosts-label"] { display: none; }
+  [class*="_frame"]:has(> [class*="_handle"]) [data-dsh-remote="hosts-label"] { display: inline; }
   @media (prefers-reduced-motion: reduce) {
     [class*="_frame"] > [class*="sidebarCol"],
     [class*="_frame"]::after { transition: none; }
@@ -284,6 +288,34 @@ function injectNarrowScreenCss(html) {
     mask.append(bar, pre)
     document.body.append(mask)
   }
+
+  // 侧栏底部的 sidebar.footer.action 插槽:官方留给第三方放自己入口的位置。
+  // 这里放「主机」按钮,点了让外层的手机客户端打开它自己的主机页。
+  // 只在被 iframe 套着时出现——浏览器直接开 dsh web 的人按了没有意义。
+  function mountHostsTrigger() {
+    if (window.parent === window) return
+    var slot = document.querySelector('[data-slot="sidebar.footer.action"]')
+    if (!slot || slot.querySelector('[data-dsh-remote="hosts-trigger"]')) return
+    var settings = document.querySelector('[data-slot="settings.trigger"]')
+    var reference = settings && settings.closest ? settings.closest('button') : null
+    if (!reference) return
+    var button = document.createElement('button')
+    button.type = 'button'
+    button.setAttribute('data-dsh-remote', 'hosts-trigger')
+    button.setAttribute('aria-label', '主机')
+    // 类名带内容哈希,照抄隔壁「设置」按钮当前的,外观自然一致
+    button.className = reference.className
+    button.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg><span data-dsh-remote="hosts-label">主机</span>'
+    button.addEventListener('click', function () {
+      window.parent.postMessage({ type: 'dsh-remote:open-hosts' }, '*')
+    })
+    slot.append(button)
+    // 侧栏展开/收起时「设置」按钮会换类名(rail 与否),跟着同步
+    new MutationObserver(function () { button.className = reference.className })
+      .observe(reference, { attributes: true, attributeFilter: ['class'] })
+  }
+  mountHostsTrigger()
+  new MutationObserver(mountHostsTrigger).observe(document.documentElement, { childList: true, subtree: true })
 
   document.addEventListener('click', function (event) {
     if (!narrow.matches) return

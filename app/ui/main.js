@@ -20,9 +20,13 @@ function showView(name) {
   el('pair-cancel').classList.toggle('hidden', false)
 }
 
+/** web UI 的来源;只认这个源发来的消息 */
+let webUiOrigin = null
+
 // 主机的完整 dsh web UI 顶上来:顶栏收窄成一条,把高度还给它
 function showWebUi(url) {
   const frame = el('webui')
+  webUiOrigin = new URL(url).origin
   if (frame.src !== url) frame.src = url
   for (const v of Object.values(views)) v.classList.add('hidden')
   frame.classList.remove('hidden')
@@ -44,7 +48,6 @@ function backToLive() {
 
 function setSlim(slim) {
   el('topbar').classList.toggle('slim', slim)
-  el('switch-host').classList.toggle('hidden', !slim)
 }
 
 function setStatus(status, text) {
@@ -275,7 +278,15 @@ el('hosts-back').addEventListener('click', () => {
 el('add-host').addEventListener('click', openPairView)
 el('reconnect').addEventListener('click', () => { startConnect(null) })
 el('open-hosts').addEventListener('click', () => { refreshHosts(); showView('hosts') })
-el('switch-host').addEventListener('click', () => { refreshHosts(); showView('hosts') })
+
+// 主机页的入口在 dsh 侧栏底部(插件往 sidebar.footer.action 插槽挂的按钮),
+// 那个按钮在 iframe 里、跨源,只能经 postMessage 过来;只认 web UI 那个源。
+window.addEventListener('message', (e) => {
+  if (webUiOrigin === null || e.origin !== webUiOrigin) return
+  if (e.data?.type !== 'dsh-remote:open-hosts') return
+  refreshHosts()
+  showView('hosts')
+})
 
 // 回前台即重连:Android 会在后台掐掉网络,回来时旧连接多半已死
 document.addEventListener('visibilitychange', () => {
