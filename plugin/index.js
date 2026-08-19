@@ -8,12 +8,16 @@
  */
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const name = 'dsh-plugin-mobile-remote'
-const inject = ['webServer']
+const inject = ['webServer', 'settings']
+
+/** 手机侧只读查看配置文件的路由 */
+const CONFIG_DOCUMENT_PATH = '/mobile-remote/config-document'
 
 /**
  * @param {import('@deepseek-ai/cordis').Context} ctx
@@ -80,6 +84,35 @@ function apply(ctx, config = {}) {
   })
 
   ctx.effect(() => ctx.webServer.tapIndex(injectNarrowScreenCss))
+
+  // 「打开配置文件」在宿主机桌面开编辑器,手机上按了毫无反应。这条路由把同一份
+  // 文件的内容原样交给手机自己渲染。路径由 Host 侧的 settings.documentPath 决定,
+  // 不接受客户端传路径——否则就成了任意文件读取。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: CONFIG_DOCUMENT_PATH,
+    handler: async (_req, res) => {
+      const path = await ctx.settings.prepareDocument()
+      if (path === undefined) {
+        res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' })
+        res.end('当前的设置存储不是本地文件,没有可查看的配置文件')
+        return
+      }
+      let text
+      try {
+        text = await readFile(path, 'utf8')
+      } catch (error) {
+        res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' })
+        res.end(`读不到配置文件 ${path}: ${String(error)}`)
+        return
+      }
+      res.writeHead(200, {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+      })
+      res.end(JSON.stringify({ path, text }))
+    },
+  }))
 
   ctx.on('approval/request', async (req, next) => {
     send({ type: 'approval', id: req.callId, tool_name: req.toolName ?? '', reason: req.reason ?? '' })
@@ -225,6 +258,44 @@ function injectNarrowScreenCss(html) {
     event.preventDefault()
     event.stopPropagation()
     toggle.click()
+  }, true)
+
+  // 「打开配置文件」会在宿主机桌面开编辑器,手机上按了毫无反应。窄屏下改成
+  // 就地渲染文件内容——只读,想改仍然去电脑上改。
+  function viewer(title, body, error) {
+    var mask = document.createElement('div')
+    mask.setAttribute('data-dsh-remote', 'config-viewer')
+    mask.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:var(--dsh-remote-bg,#fff);display:flex;flex-direction:column;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;color:#0f1115'
+    if (matchMedia('(prefers-color-scheme: dark)').matches) mask.style.background = '#151517', mask.style.color = '#f9fafb'
+    var bar = document.createElement('div')
+    bar.style.cssText = 'flex:none;display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(128,128,128,.28)'
+    var name = document.createElement('div')
+    name.style.cssText = 'flex:1;min-width:0;font-size:12px;opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+    name.textContent = title
+    var close = document.createElement('button')
+    close.textContent = '关闭'
+    close.style.cssText = 'flex:none;font:inherit;font-size:12px;padding:5px 12px;border-radius:14px;border:1px solid rgba(128,128,128,.35);background:transparent;color:inherit'
+    close.addEventListener('click', function () { mask.remove() })
+    bar.append(name, close)
+    var pre = document.createElement('pre')
+    pre.style.cssText = 'flex:1;margin:0;padding:14px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12px/1.7 ui-monospace,Consolas,monospace'
+    pre.textContent = error ? error : body
+    if (error) pre.style.color = '#b42318'
+    mask.append(bar, pre)
+    document.body.append(mask)
+  }
+
+  document.addEventListener('click', function (event) {
+    if (!narrow.matches) return
+    var target = event.target
+    var button = target && target.closest ? target.closest('button') : null
+    if (!button || !/打开配置文件|Open config|open the config/i.test(button.textContent || '')) return
+    event.preventDefault()
+    event.stopPropagation()
+    fetch('${CONFIG_DOCUMENT_PATH}')
+      .then(function (r) { return r.ok ? r.json() : r.text().then(function (t) { throw new Error(t) }) })
+      .then(function (d) { viewer(d.path, d.text) })
+      .catch(function (e) { viewer('配置文件', '', String(e && e.message ? e.message : e)) })
   }, true)
 })()`
   return html.replace(
