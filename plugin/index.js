@@ -145,7 +145,43 @@ function injectNarrowScreenCss(html) {
     flex: 1 1 auto !important;
     min-height: 0 !important;
   }
-  /* 竖排之后,内容区自带的头部(打开配置文件 + 关闭)会落到标签栏下方、屏幕
+  /* 侧栏展开时主框架把网格从「56px 内容」改成「280px 内容」,对话区被压到
+     140px。改成抽屉:网格保持收起时的列宽,侧栏浮到内容之上盖住一部分。
+     展开态没有专门的类名,但展开才会出现拖拽把手,用它作状态信号。
+     把手本身在手机上没用(没法拖),隐掉。 */
+  [class*="_frame"]:has(> [class*="_handle"]) {
+    grid-template-columns: 56px minmax(0, 1fr) 0px !important;
+  }
+  /* 侧栏脱离文档流后,剩下的子元素会整体上移一列(对话区掉进 56px 那列,
+     反而更窄)。显式钉住列号。 */
+  [class*="_frame"]:has(> [class*="_handle"]) > [class*="centerCol"] { grid-column: 2 !important; }
+  [class*="_frame"]:has(> [class*="_handle"]) > [class*="detailsCol"] { grid-column: 3 !important; }
+  [class*="_frame"]:has(> [class*="_handle"]) > [class*="sidebarCol"] {
+    position: absolute !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(300px, 84vw) !important;
+    z-index: 30 !important;
+    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.24);
+  }
+  /* 抽屉下的内容压暗,提示焦点在抽屉上;不拦指针,免得没有脚本关不掉抽屉时
+     整个页面都点不动。 */
+  [class*="_frame"]:has(> [class*="_handle"])::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 25;
+    background: rgba(0, 0, 0, 0.28);
+    pointer-events: none;
+  }
+  [class*="_frame"] > [class*="_handle"] { display: none !important; }
+
+  /* 「打开配置文件」在宿主机桌面开编辑器,手机上按了什么也看不到——和目录
+     选择器是同一类问题。手机上不给这个入口。 */
+  [role="dialog"][aria-modal="true"] [class*="_actions"] { display: none !important; }
+
+  /* 竖排之后,内容区自带的头部(关闭键)会落到标签栏下方、屏幕
      正中,很别扭。钉到弹窗右上角,与标题同一行——手机弹窗关闭键就该在那儿。 */
   [role="dialog"][aria-modal="true"] { position: relative !important; }
   [role="dialog"][aria-modal="true"] > div > [class*="_header"] {
