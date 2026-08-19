@@ -1,27 +1,46 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
+/* 设计令牌全部取自 dsh web UI 的实测计算值(浅色/深色各量一遍),
+   不另起一套视觉:额外加的页面和按钮要看起来就是 dsh 的一部分。
+   dsh 的主题默认「跟随系统」,所以这里跟随 prefers-color-scheme;
+   用户在 dsh 里显式选了与系统相反的主题时,外壳这一条窄带会不一致。 */
 :root {
-  --bg: #f2f4f7;
-  --card: #ffffff;
-  --text: #1a2233;
-  --muted: #667085;
-  --accent: #175cd3;
-  --accent-press: #114a9f;
-  --quiet: #3f4654;
-  --quiet-press: #2c3240;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --text: #0f1115;
+  --muted: #81858c;
+  --fill: #ebeef2;        /* 选中/主操作填充 */
+  --fill-soft: #f5f6f7;   /* 控件药丸、输入框 */
+  --border: rgba(0, 0, 0, 0.1);
   --ok: #12805c;
-  --line: #e4e7ec;
+  --warn: #b25e09;
+  --danger: #b42318;
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #151517;
+    --surface: #2c2c2e;
+    --text: #f9fafb;
+    --muted: #adb2b8;
+    --fill: #43454a;
+    --fill-soft: #353638;
+    --border: rgba(255, 255, 255, 0.12);
+    --ok: #3ddc97;
+    --warn: #f0a35e;
+    --danger: #f5766b;
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body { height: 100%; }
 body {
-  font-family: system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: 16px;
   background: var(--bg);
   color: var(--text);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  /* 安卓手势条 / 刘海:内容不被系统 UI 压住 */
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
@@ -32,17 +51,16 @@ body {
   align-items: center;
   gap: 8px;
   padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px 12px;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
 }
 .topbar.slim { padding: calc(env(safe-area-inset-top, 0px) + 5px) 12px 5px; }
-.brand { flex: 1; font-size: 17px; font-weight: 700; letter-spacing: 0.2px; }
+.brand { flex: 1; font-size: 15px; font-weight: 500; }
 .topbar.slim .brand { display: none; }
-.status { flex: 1; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
-.topbar.slim .status { font-size: 12px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.dot-off { background: #98a2b3; }
-.dot-connecting { background: #f79009; }
+.status { flex: 1; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.dot-off { background: var(--muted); }
+.dot-connecting { background: var(--warn); }
 .dot-on { background: var(--ok); }
 
 .view {
@@ -55,55 +73,70 @@ body {
 }
 .hidden { display: none !important; }
 
-h1 { font-size: 20px; margin-bottom: 10px; }
-.hint { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
-code { font-family: ui-monospace, Consolas, monospace; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+h1 { font-size: 17px; font-weight: 500; margin-bottom: 8px; }
+.hint { color: var(--muted); font-size: 12px; line-height: 1.7; margin-bottom: 18px; }
+code {
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  background: var(--fill-soft);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
 
-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 14px; }
 input {
   display: block;
   width: 100%;
   margin-top: 6px;
-  padding: 11px 12px;
+  padding: 11px 14px;
+  font-family: inherit;
   font-size: 16px; /* 低于 16px 时移动浏览器会在聚焦时自动放大页面 */
   color: var(--text);
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  background: var(--fill-soft);
+  border: 1px solid transparent;
+  border-radius: 12px;
   outline: none;
 }
-input:focus { border-color: var(--accent); }
+input:focus { border-color: var(--border); }
+input::placeholder { color: var(--muted); }
 
+/* dsh 的按钮语汇:主操作=浅填充块,次操作=描边,都是深色文字、400 字重 */
 .btn {
-  border: none;
-  border-radius: 8px;
-  padding: 12px 18px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #fff;
-  background: var(--accent);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text);
+  background: var(--fill);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 10px 16px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.btn:active { background: var(--accent-press); }
+.btn:active { opacity: 0.72; }
+.btn:disabled { opacity: 0.45; }
 .btn-block { display: block; width: 100%; margin-top: 10px; }
-.btn-quiet { background: var(--quiet); }
-.btn-quiet:active { background: var(--quiet-press); }
-.btn-slim { flex: none; padding: 6px 12px; font-size: 12px; border-radius: 6px; background: var(--quiet); }
-.btn-slim:active { background: var(--quiet-press); }
+.btn-quiet { background: transparent; border-color: var(--border); }
+.btn-slim {
+  flex: none;
+  background: transparent;
+  border-color: var(--border);
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 14px;
+}
 
-.error { color: #b42318; font-size: 13px; margin: 0 0 12px; }
+.error { color: var(--danger); font-size: 12px; margin: 0 0 12px; }
 
 .webui {
   flex: 1;
   width: 100%;
   border: none;
-  background: var(--card);
+  background: var(--bg);
 }
 
 .empty {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
   text-align: center;
   line-height: 1.7;
   padding: 48px 24px;
