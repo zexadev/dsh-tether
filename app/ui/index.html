@@ -16,12 +16,12 @@
   </header>
 
   <main id="view-hosts" class="view hidden">
-    <h1>我的主机</h1>
-    <p class="hint">配过的主机都留在这台手机上,换一台不用重新填凭证。</p>
+    <h1>我的电脑</h1>
+    <p class="hint">配过的电脑都记在这台手机上,换一台不用重新配对。</p>
     <ul id="host-list" class="host-list"></ul>
-    <p id="hosts-empty" class="empty hidden">还没有已保存的主机。</p>
+    <p id="hosts-empty" class="empty hidden">还没有配对过的电脑。</p>
     <p id="hosts-error" class="error hidden"></p>
-    <button id="add-host" class="btn btn-block">添加主机</button>
+    <button id="add-host" class="btn btn-block">添加电脑</button>
     <button id="hosts-back" class="btn btn-quiet btn-block hidden">返回</button>
     <footer class="about">
       <span id="about-version">DSH Tether</span>
@@ -30,15 +30,15 @@
   </main>
 
   <main id="view-pair" class="view hidden">
-    <h1>添加主机</h1>
+    <h1>添加电脑</h1>
     <p class="hint">电脑上跑 <code>dsh web</code> 后,插件会打印一行配对串,整行粘到下面即可。</p>
-    <label>配对串(主机 ID#配对码)
-      <input id="pair-peer" type="text" autocomplete="off" spellcheck="false" placeholder="粘贴整行,或只填主机 ID" />
+    <label>配对串
+      <input id="pair-peer" type="text" autocomplete="off" spellcheck="false" placeholder="粘贴电脑上显示的那一整行" />
     </label>
     <label>配对码(已在上面粘贴则免填)
       <input id="pair-code" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="6 位数字" />
     </label>
-    <label>给这台主机起个名字
+    <label>给这台电脑起个名字
       <input id="pair-label" type="text" autocomplete="off" placeholder="例如:家里的电脑" />
     </label>
     <label>本机名称(电脑上会显示成这个)
@@ -53,9 +53,9 @@
     <div id="reconnect-row" class="hidden">
       <p id="reconnect-text" class="hint"></p>
       <button id="reconnect" class="btn btn-block">重新连接</button>
-      <button id="open-hosts" class="btn btn-quiet btn-block">选择其它主机</button>
+      <button id="open-hosts" class="btn btn-quiet btn-block">换一台电脑</button>
     </div>
-    <p id="connecting-note" class="empty">正在打开主机上的 DeepSeek Harness…</p>
+    <p id="connecting-note" class="empty">正在打开电脑上的 DeepSeek Harness…</p>
   </main>
 
   <iframe id="webui" class="webui hidden" title="DeepSeek Harness"></iframe>

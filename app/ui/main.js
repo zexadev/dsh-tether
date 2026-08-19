@@ -128,7 +128,7 @@ function renderHosts() {
       const input = document.createElement('input')
       input.className = 'host-rename'
       input.value = host.label
-      input.placeholder = '给这台主机起个名字'
+      input.placeholder = '给这台电脑起个名字'
       const save = () => {
         rowMode.delete(host.id)
         runHostAction(invoke('rename_host', { id: host.id, label: input.value }))
@@ -250,7 +250,7 @@ el('pair-submit').addEventListener('click', async () => {
     if (!code) code = c.trim()
   }
   if (!peer || !code) {
-    err.textContent = '配对串不完整:需要主机 ID 和 6 位配对码'
+    err.textContent = '配对串不完整:要电脑上显示的那一整行'
     err.classList.remove('hidden')
     return
   }

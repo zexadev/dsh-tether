@@ -19,6 +19,8 @@ const inject = ['webServer', 'settings']
 
 /** 手机侧只读查看配置文件的路由 */
 const CONFIG_DOCUMENT_PATH = '/dsh-tether/config-document'
+/** 按需开一个配对窗口,拿回配对串 */
+const PAIRING_PATH = '/dsh-tether/pairing'
 
 /**
  * @param {import('@deepseek-ai/cordis').Context} ctx
@@ -48,6 +50,8 @@ function apply(ctx, config = {}) {
 
   const send = (msg) => { child.stdin.write(JSON.stringify(msg) + '\n') }
   let endpointId = ''
+  /** 等着拿配对串的那个请求;sidecar 回 pairing 时兑现 */
+  let pendingPairing
 
   createInterface({ input: child.stdout }).on('line', (line) => {
     let msg
@@ -63,10 +67,15 @@ function apply(ctx, config = {}) {
         console.log(`[tether] 就绪,本机设备 ID: ${endpointId}`)
         console.log(`[tether] 手机将看到 http://${proxyTarget} 的完整界面`)
         break
-      case 'pairing':
+      case 'pairing': {
         // 一行可整体粘贴到手机,省去分别输 ID 和码
-        console.log(`[tether] 配对串(${Math.round(msg['expires_in_sec'] / 60)} 分钟内有效): ${endpointId}#${msg.code}`)
+        const pairingString = `${endpointId}#${msg.code}`
+        console.log(`[tether] 配对串(${Math.round(msg['expires_in_sec'] / 60)} 分钟内有效): ${pairingString}`)
+        const waiter = pendingPairing
+        pendingPairing = undefined
+        waiter?.({ pairingString, expiresInSec: msg['expires_in_sec'] })
         break
+      }
       case 'pairing-closed':
         console.log(`[tether] 配对窗口已关闭: ${msg.reason}`)
         break
@@ -120,6 +129,31 @@ function apply(ctx, config = {}) {
     },
   }))
 
+  // 配对窗口只在白名单为空时自动开一次;换手机、加第二台设备都得能再开一个,
+  // 否则用户只能去手工删 paired.json。这条路由就是那个开关。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: PAIRING_PATH,
+    handler: async (_req, res) => {
+      const result = await new Promise((resolve) => {
+        pendingPairing = resolve
+        send({ type: 'pairing-begin' })
+        setTimeout(() => {
+          if (pendingPairing !== resolve) return
+          pendingPairing = undefined
+          resolve(undefined)
+        }, 5000)
+      })
+      if (result === undefined) {
+        res.writeHead(504, { 'content-type': 'text/plain; charset=utf-8' })
+        res.end('sidecar 没有在 5 秒内给出配对码')
+        return
+      }
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+      res.end(JSON.stringify(result))
+    },
+  }))
+
   ctx.on('approval/request', async (req, next) => {
     send({ type: 'approval', id: req.callId, tool_name: req.toolName ?? '', reason: req.reason ?? '' })
     try {
@@ -142,7 +176,7 @@ function injectNarrowScreenCss(html) {
   /* hero 背后的装饰性发光椭圆比视口宽,会让整页能被横向拖动 */
   html, body { overflow-x: hidden; }
   /* 弹窗在窄屏铺满,别再留出用不上的边距 */
-  [role="dialog"][aria-modal="true"] {
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) {
     width: 100% !important;
     max-width: 100% !important;
     height: 100% !important;
@@ -160,26 +194,26 @@ function injectNarrowScreenCss(html) {
   /* 弹窗是「左导航 + 右内容」横向排列,导航固定 188px——在 412px 的手机上
      占掉 45%,内容只剩两百出头。改成导航横排在顶、内容占满整宽。
      导航是 <nav> 标签、内容是弹窗下唯一的直接 div,都用结构选择器命中。 */
-  [role="dialog"][aria-modal="true"] { display: flex !important; flex-direction: column !important; }
-  [role="dialog"][aria-modal="true"] > nav {
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) { display: flex !important; flex-direction: column !important; }
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) > nav {
     width: 100% !important;
     height: auto !important;
     flex: none !important;
   }
-  [role="dialog"][aria-modal="true"] > nav [class*="navList"] {
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) > nav [class*="navList"] {
     flex-direction: row !important;
     overflow-x: auto !important;
     height: auto !important;
     gap: 6px;
     scrollbar-width: none;
   }
-  [role="dialog"][aria-modal="true"] > nav [class*="navList"]::-webkit-scrollbar { display: none; }
-  [role="dialog"][aria-modal="true"] > nav [class*="navCell"] {
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) > nav [class*="navList"]::-webkit-scrollbar { display: none; }
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) > nav [class*="navCell"] {
     flex: none !important;
     width: auto !important;
     white-space: nowrap;
   }
-  [role="dialog"][aria-modal="true"] > div {
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) > div {
     width: 100% !important;
     flex: 1 1 auto !important;
     min-height: 0 !important;
@@ -240,8 +274,8 @@ function injectNarrowScreenCss(html) {
 
   /* 竖排之后,内容区自带的头部(关闭键)会落到标签栏下方、屏幕
      正中,很别扭。钉到弹窗右上角,与标题同一行——手机弹窗关闭键就该在那儿。 */
-  [role="dialog"][aria-modal="true"] { position: relative !important; }
-  [role="dialog"][aria-modal="true"] > div > [class*="_header"] {
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) { position: relative !important; }
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) > div > [class*="_header"] {
     position: absolute !important;
     top: 10px;
     right: 12px;
@@ -272,34 +306,86 @@ function injectNarrowScreenCss(html) {
 
   // 「打开配置文件」会在宿主机桌面开编辑器,手机上按了毫无反应。窄屏下改成
   // 就地渲染文件内容——只读,想改仍然去电脑上改。
+  // 色值/圆角/字重全部取自 dsh 自身的实测计算值,别在人家界面里插一块不一样的东西。
+  // 窄屏铺满一屏,宽屏收成居中卡片——和 dsh 的弹窗一个做法。
   function viewer(title, body, error) {
+    var dark = matchMedia('(prefers-color-scheme: dark)').matches
+    var t = dark
+      ? { fg: '#f9fafb', surface: '#2c2c2e', line: 'rgba(255,255,255,.12)', muted: '#adb2b8', danger: '#f5766b' }
+      : { fg: '#0f1115', surface: '#ffffff', line: 'rgba(0,0,0,.1)', muted: '#81858c', danger: '#b42318' }
+
     var mask = document.createElement('div')
-    mask.setAttribute('data-dsh-tether', 'config-viewer')
-    mask.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:var(--dsh-tether-bg,#fff);display:flex;flex-direction:column;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;color:#0f1115'
-    if (matchMedia('(prefers-color-scheme: dark)').matches) mask.style.background = '#151517', mask.style.color = '#f9fafb'
+    mask.setAttribute('data-dsh-tether', 'viewer')
+    mask.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;'
+      + 'font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;color:' + t.fg + ';'
+      + (narrow.matches ? 'background:' + t.surface : 'background:rgba(0,0,0,.32);padding:24px')
+
+    var card = document.createElement('div')
+    card.setAttribute('data-dsh-tether', 'card')
+    card.setAttribute('role', 'dialog')
+    card.setAttribute('aria-modal', 'true')
+    card.style.cssText = 'display:flex;flex-direction:column;background:' + t.surface + ';'
+      + (narrow.matches
+        ? 'width:100%;height:100%'
+        : 'width:min(620px,100%);max-height:min(70vh,720px);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.24)')
+
     var bar = document.createElement('div')
-    bar.style.cssText = 'flex:none;display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(128,128,128,.28)'
+    bar.style.cssText = 'flex:none;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid ' + t.line
     var name = document.createElement('div')
-    name.style.cssText = 'flex:1;min-width:0;font-size:12px;opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+    name.style.cssText = 'flex:1;min-width:0;font-size:12px;color:' + t.muted
     name.textContent = title
+
+    // dsh 的次要按钮就是这个样子:透明底 + 1px 描边 + 14 圆角 + 12px 常规字重
+    var slim = 'flex:none;font:inherit;font-size:12px;font-weight:400;padding:5px 12px;border-radius:14px;'
+      + 'border:1px solid ' + t.line + ';background:transparent;color:inherit;cursor:pointer'
+    var copy = document.createElement('button')
+    copy.textContent = '复制'
+    copy.style.cssText = slim
+    copy.addEventListener('click', function () {
+      navigator.clipboard.writeText(body).then(
+        function () { copy.textContent = '已复制' },
+        function () { copy.textContent = '复制失败' },
+      )
+    })
     var close = document.createElement('button')
     close.textContent = '关闭'
-    close.style.cssText = 'flex:none;font:inherit;font-size:12px;padding:5px 12px;border-radius:14px;border:1px solid rgba(128,128,128,.35);background:transparent;color:inherit'
+    close.style.cssText = slim
     close.addEventListener('click', function () { mask.remove() })
-    bar.append(name, close)
+    bar.append(name)
+    if (!error) bar.append(copy)
+    bar.append(close)
+
     var pre = document.createElement('pre')
-    pre.style.cssText = 'flex:1;margin:0;padding:14px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12px/1.7 ui-monospace,Consolas,monospace'
+    pre.style.cssText = 'flex:1;margin:0;padding:16px;overflow:auto;white-space:pre-wrap;word-break:break-all;'
+      + 'font:13px/1.8 ui-monospace,"SF Mono",Consolas,monospace' + (error ? ';color:' + t.danger : '')
     pre.textContent = error ? error : body
-    if (error) pre.style.color = '#b42318'
-    mask.append(bar, pre)
+
+    card.append(bar, pre)
+    mask.append(card)
+    // 宽屏点遮罩关闭,窄屏没有遮罩可点
+    if (!narrow.matches) mask.addEventListener('click', function (e) { if (e.target === mask) mask.remove() })
     document.body.append(mask)
   }
 
   // 侧栏底部的 sidebar.footer.action 插槽:官方留给第三方放自己入口的位置。
   // 这里放「主机」按钮,点了让外层的手机客户端打开它自己的主机页。
-  // 只在被 iframe 套着时出现——浏览器直接开 dsh web 的人按了没有意义。
+  // 同一个按钮两种归宿:手机 App 里打开它自己的主机页;电脑浏览器里出示配对串,
+  // 好让用户换手机、加设备时有地方拿新配对码(否则只能去删 paired.json)。
+  var framed = window.parent !== window
+
+  function showPairing() {
+    fetch('${PAIRING_PATH}')
+      .then(function (r) { return r.ok ? r.json() : r.text().then(function (t) { throw new Error(t) }) })
+      .then(function (d) {
+        viewer(
+          '在手机上「添加电脑」里粘贴整行,' + Math.round(d.expiresInSec / 60) + ' 分钟内有效',
+          d.pairingString,
+        )
+      })
+      .catch(function (e) { viewer('配对', '', String(e && e.message ? e.message : e)) })
+  }
+
   function mountHostsTrigger() {
-    if (window.parent === window) return
     var slot = document.querySelector('[data-slot="sidebar.footer.action"]')
     if (!slot || slot.querySelector('[data-dsh-tether="hosts-trigger"]')) return
     var settings = document.querySelector('[data-slot="settings.trigger"]')
@@ -308,12 +394,14 @@ function injectNarrowScreenCss(html) {
     var button = document.createElement('button')
     button.type = 'button'
     button.setAttribute('data-dsh-tether', 'hosts-trigger')
-    button.setAttribute('aria-label', '主机')
+    var label = framed ? '我的电脑' : '连接手机'
+    button.setAttribute('aria-label', label)
     // 类名带内容哈希,照抄隔壁「设置」按钮当前的,外观自然一致
     button.className = reference.className
-    button.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg><span data-dsh-tether="hosts-label">主机</span>'
+    button.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg><span data-dsh-tether="hosts-label">' + label + '</span>'
     button.addEventListener('click', function () {
-      window.parent.postMessage({ type: 'dsh-tether:open-hosts' }, '*')
+      if (framed) window.parent.postMessage({ type: 'dsh-tether:open-hosts' }, '*')
+      else showPairing()
     })
     slot.append(button)
     // 侧栏展开/收起时「设置」按钮会换类名(rail 与否),跟着同步

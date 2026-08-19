@@ -250,7 +250,7 @@ fn app_version() -> &'static str {
 fn rename_host(app: AppHandle, id: String, label: String) -> Result<HostBook, String> {
     let mut book = load_book(&app);
     let Some(host) = book.hosts.iter_mut().find(|h| h.id == id) else {
-        return Err("这台主机不在已保存列表里".into());
+        return Err("这台电脑不在已配对列表里".into());
     };
     host.label = label.trim().to_string();
     save_book(&app, &book).map_err(|e| format!("{e:#}"))?;
@@ -297,10 +297,10 @@ async fn connect(app: AppHandle, id: Option<String>) -> Result<(), String> {
     let mut book = load_book(&app);
     let target = id.or_else(|| book.current.clone()).or_else(|| book.hosts.first().map(|h| h.id.clone()));
     let Some(target) = target else {
-        return Err("还没有已保存的主机".into());
+        return Err("还没有配对过的电脑".into());
     };
     if !book.hosts.iter().any(|h| h.id == target) {
-        return Err("这台主机不在已保存列表里".into());
+        return Err("这台电脑不在已配对列表里".into());
     }
     if book.current.as_deref() != Some(target.as_str()) {
         book.current = Some(target.clone());
