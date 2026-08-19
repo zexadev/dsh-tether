@@ -2,6 +2,9 @@ const { invoke } = window.__TAURI__.core
 const { listen } = window.__TAURI__.event
 const notification = window.__TAURI__.notification
 
+/** 项目主页;仓库还没建,填上即在主机页底部出现入口 */
+const PROJECT_URL = ''
+
 const el = (id) => document.getElementById(id)
 const views = { hosts: el('view-hosts'), pair: el('view-pair'), status: el('view-status') }
 
@@ -303,6 +306,14 @@ async function boot() {
   await listen('remote:proxy-ready', (e) => showWebUi(e.payload.url))
   await listen('remote:approval', (e) => notifyApproval(e.payload))
   await ensureNotifyPermission()
+  invoke('app_version')
+    .then((v) => { el('about-version').textContent = `DSH Remote v${v}` })
+    .catch(() => {})
+  if (PROJECT_URL !== '') {
+    const link = el('about-link')
+    link.href = PROJECT_URL
+    link.classList.remove('hidden')
+  }
   await refreshHosts()
   if (book.hosts.length > 0) startConnect(null)
   else showView('pair')

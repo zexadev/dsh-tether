@@ -239,6 +239,12 @@ fn list_hosts(app: AppHandle) -> HostBook {
     load_book(&app)
 }
 
+/// 构建时写死的版本号,避免界面上再手抄一份而漂移
+#[tauri::command]
+fn app_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
 /// 给已保存的主机改名。凭证不变,只动本地显示名。
 #[tauri::command]
 fn rename_host(app: AppHandle, id: String, label: String) -> Result<HostBook, String> {
@@ -311,7 +317,14 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .manage(AppState::default())
-        .invoke_handler(tauri::generate_handler![list_hosts, rename_host, forget_host, pair, connect])
+        .invoke_handler(tauri::generate_handler![
+            list_hosts,
+            rename_host,
+            forget_host,
+            pair,
+            connect,
+            app_version
+        ])
         .run(tauri::generate_context!())
         .expect("tauri 启动失败");
 }

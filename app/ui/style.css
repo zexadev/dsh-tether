@@ -162,6 +162,18 @@ input::placeholder { color: var(--muted); }
   font-size: 16px;
 }
 .btn-slim-quiet { background: transparent; }
+
+.about {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+}
+.about-link { color: var(--muted); }
 .host-meta {
   font-size: 11px;
   color: var(--muted);
