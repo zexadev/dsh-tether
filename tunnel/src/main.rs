@@ -17,7 +17,7 @@ use tokio::io::copy_bidirectional;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Semaphore;
 
-const ALPN: &[u8] = b"dsh-tunnel/0";
+const ALPN: &[u8] = b"dsh-tether-tunnel/0";
 /// 单个 iroh 连接上并发转发流上限(浏览器并行请求 + 两条长连 WebSocket 足够)
 const MAX_STREAMS: usize = 64;
 

@@ -8,7 +8,7 @@ use iroh::endpoint::{RecvStream, SendStream};
 use iroh::SecretKey;
 use serde::{Deserialize, Serialize};
 
-pub const ALPN: &[u8] = b"dsh-remote/0";
+pub const ALPN: &[u8] = b"dsh-tether/0";
 /// 控制流单行上限;审批 reason 是模型生成的自然语言,给足余量
 pub const MAX_LINE: usize = 64 * 1024;
 /// 未配对连接首行上限:只够一条 pair 消息,不给未授权方喂大负载的机会

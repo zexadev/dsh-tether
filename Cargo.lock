@@ -1270,17 +1270,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "dsh-remote-app"
+name = "dsh-tether-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "iroh",
- "remote-core",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-notification",
+ "tether-core",
  "tokio",
 ]
 
@@ -3097,21 +3097,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mobile-remote-host"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "dirs",
- "iroh",
- "rand 0.9.5",
- "remote-core",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "moka"
 version = "0.12.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4365,16 +4350,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
-name = "remote-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "iroh",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "reqwest"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5580,6 +5555,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5fed54709c5b3a53d09bb1c113ea4f5ceafd1e772ddcb0030a82e1d56c087b08"
 dependencies = [
  "new_debug_unreachable",
+]
+
+[[package]]
+name = "tether-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "iroh",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "tether-host"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "dirs",
+ "iroh",
+ "rand 0.9.5",
+ "serde",
+ "serde_json",
+ "tether-core",
+ "tokio",
 ]
 
 [[package]]

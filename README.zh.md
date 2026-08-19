@@ -1,4 +1,4 @@
-# DSH Remote
+# DSH Tether
 
 [English](README.md)
 
@@ -22,7 +22,7 @@ DSH 的手机客户端已经有九个。除了这个,另外两个值得你知道
 ```
 [Android · Tauri 2]                          [你的开发机]
  WebView  ─── http://127.0.0.1:<端口> ─┐      dsh web
- (DSH 自己的 web UI)                   │       └─ dsh-plugin-mobile-remote
+ (DSH 自己的 web UI)                   │       └─ dsh-plugin-tether
  iroh 客户端 ──── P2P 直连 ────────────┴──────────  (Cordis 插件,内嵌 iroh)
 ```
 
@@ -42,8 +42,8 @@ DSH 的手机客户端已经有九个。除了这个,另外两个值得你知道
 需要 Node ^22.19 || >=24、Rust,构建 APK 还需 JDK 21 + Android SDK/NDK。Windows 上可用 `scripts/setup-android-env.ps1` 装齐 Android 那一侧。
 
 ```sh
-cargo build --release -p mobile-remote-host       # 插件的 sidecar
-dsh plugin --profile web add /path/to/dsh-remote/plugin
+cargo build --release -p tether-host       # 插件的 sidecar
+dsh plugin --profile web add /path/to/dsh-tether/plugin
 dsh web                                            # 会打印配对串
 ```
 
@@ -72,8 +72,8 @@ pnpm exec tauri android build --apk --target aarch64
 最后一行是整个项目的立意所在,所以给证据而不是给说法。手机 WiFi 关掉(`wifi_on=0`,状态栏只剩 5G)、电脑在家宽,插件侧输出:
 
 ```
-[mobile-remote] 手机已连接: 我的手机
-[mobile-remote] 连接路径: P2P 直连(NAT 打洞成功) Ip(152.67.154.117:41341)
+[tether] 手机已连接: 我的手机
+[tether] 连接路径: P2P 直连(NAT 打洞成功) Ip(152.67.154.117:41341)
 ```
 
 选中路径是一个公网地址,说明两端是打洞打通的,relay 全程没用上。(手机还开着 VPN,所以对端地址是它的 VPN 出口——结论不变:两个不同的网络,中间没有服务器。)手机在这条路径上完整渲染了 DSH 界面,见 [`assets/phone-cellular.png`](assets/phone-cellular.png)。

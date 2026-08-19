@@ -1,5 +1,5 @@
 {
-  "name": "dsh-plugin-mobile-remote",
+  "name": "dsh-plugin-tether",
   "version": "0.1.0",
   "description": "DSH approval remote: subscribe approval requests on the host, decide from your phone over iroh P2P",
   "type": "module",

@@ -1,4 +1,4 @@
-# DSH Remote
+# DSH Tether
 
 [中文](README.zh.md)
 
@@ -22,7 +22,7 @@ This one exists for the remaining case: **you are not on your machine's network,
 ```
 [Android · Tauri 2]                          [your dev machine]
  WebView  ─── http://127.0.0.1:<port> ─┐      dsh web
- (DSH's own web UI)                    │       └─ dsh-plugin-mobile-remote
+ (DSH's own web UI)                    │       └─ dsh-plugin-tether
  iroh client ──── P2P, direct ─────────┴──────────  (Cordis plugin, embeds iroh)
 ```
 
@@ -42,8 +42,8 @@ Approvals are answered by DSH's own web UI on your phone — this plugin deliber
 Requires Node ^22.19 || >=24, Rust, and (for building the APK) JDK 21 + Android SDK/NDK. `scripts/setup-android-env.ps1` sets up the Android side on Windows.
 
 ```sh
-cargo build --release -p mobile-remote-host       # the plugin's sidecar
-dsh plugin --profile web add /path/to/dsh-remote/plugin
+cargo build --release -p tether-host       # the plugin's sidecar
+dsh plugin --profile web add /path/to/dsh-tether/plugin
 dsh web                                            # prints the pairing string
 ```
 
@@ -72,8 +72,8 @@ Tested against **dsh `0.1.0-rc.7`** (the ecosystem has split — the desktop cli
 The last row is the whole point of the project, so here is the evidence rather than a claim. With the phone's Wi-Fi switched off (`wifi_on=0`, only 5G in the status bar) and the machine on home broadband, the plugin reported:
 
 ```
-[mobile-remote] 手机已连接: 我的手机
-[mobile-remote] 连接路径: P2P 直连(NAT 打洞成功) Ip(152.67.154.117:41341)
+[tether] 手机已连接: 我的手机
+[tether] 连接路径: P2P 直连(NAT 打洞成功) Ip(152.67.154.117:41341)
 ```
 
 A public address on the selected path means the two ends hole-punched through to each other; the relay was never used. (The phone also had a VPN on, so the peer address is its VPN exit — the point stands: two different networks, no server in between.) The phone rendered the full DSH web UI over that path — see [`assets/phone-cellular.png`](assets/phone-cellular.png).

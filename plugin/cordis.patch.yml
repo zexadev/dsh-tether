@@ -1,7 +1,7 @@
 # 手机客户端的组合层。
 - insert:
-    - id: mobile-remote
-      name: dsh-plugin-mobile-remote
+    - id: dsh-tether
+      name: dsh-plugin-tether
     # 目录选择器换成「应用内浏览」后端(下面同时停掉默认的自动选择器)。
     # 两半都要挂:host 半边提供 ctx.directoryPicker,client 半边填 ui-workspace
     # 的目录流插槽;只挂 host 半边的话侧栏「添加工作区」按钮会整个消失。

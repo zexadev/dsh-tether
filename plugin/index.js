@@ -1,5 +1,5 @@
 /**
- * dsh 手机客户端:电脑侧插件。sidecar(mobile-remote-host)内嵌 iroh endpoint,
+ * dsh 手机客户端:电脑侧插件。sidecar(tether-host)内嵌 iroh endpoint,
  * 把本机 dsh web UI 经 P2P 直连带到已配对手机上。
  *
  * 审批不由本插件认领:手机上跑的就是完整 web UI,`dsh-host-apiproxy` 是它的终端
@@ -13,11 +13,11 @@ import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
-const name = 'dsh-plugin-mobile-remote'
+const name = 'dsh-plugin-tether'
 const inject = ['webServer', 'settings']
 
 /** 手机侧只读查看配置文件的路由 */
-const CONFIG_DOCUMENT_PATH = '/mobile-remote/config-document'
+const CONFIG_DOCUMENT_PATH = '/dsh-tether/config-document'
 
 /**
  * @param {import('@deepseek-ai/cordis').Context} ctx
@@ -26,7 +26,7 @@ const CONFIG_DOCUMENT_PATH = '/mobile-remote/config-document'
 function apply(ctx, config = {}) {
   const binary = config.hostBinary ?? defaultHostBinary()
   if (!existsSync(binary)) {
-    throw new Error(`[mobile-remote] 找不到 sidecar 二进制: ${binary}(先 cargo build -p mobile-remote-host,或在插件 config.hostBinary 指定路径)`)
+    throw new Error(`[tether] 找不到 sidecar 二进制: ${binary}(先 cargo build -p tether-host,或在插件 config.hostBinary 指定路径)`)
   }
   // webServer.port 是真实监听端口(config 写 0 时为 OS 分配值),手机由此拿到完整界面
   const proxyTarget = `${ctx.webServer.host}:${ctx.webServer.port}`
@@ -37,7 +37,7 @@ function apply(ctx, config = {}) {
   ctx.effect(() => () => { child.kill() })
   child.on('exit', (code) => {
     // sidecar 死了必须可见:手机端会静默失联,而电脑侧一切照常
-    console.error(`[mobile-remote] sidecar 退出 code=${code};手机端已失联`)
+    console.error(`[tether] sidecar 退出 code=${code};手机端已失联`)
   })
 
   const send = (msg) => { child.stdin.write(JSON.stringify(msg) + '\n') }
@@ -48,38 +48,38 @@ function apply(ctx, config = {}) {
     try {
       msg = JSON.parse(line)
     } catch {
-      console.error(`[mobile-remote] 无法解析 sidecar 消息: ${line}`)
+      console.error(`[tether] 无法解析 sidecar 消息: ${line}`)
       return
     }
     switch (msg.type) {
       case 'ready':
         endpointId = msg['endpoint_id']
-        console.log(`[mobile-remote] 就绪,本机设备 ID: ${endpointId}`)
-        console.log(`[mobile-remote] 手机将看到 http://${proxyTarget} 的完整界面`)
+        console.log(`[tether] 就绪,本机设备 ID: ${endpointId}`)
+        console.log(`[tether] 手机将看到 http://${proxyTarget} 的完整界面`)
         break
       case 'pairing':
         // 一行可整体粘贴到手机,省去分别输 ID 和码
-        console.log(`[mobile-remote] 配对串(${Math.round(msg['expires_in_sec'] / 60)} 分钟内有效): ${endpointId}#${msg.code}`)
+        console.log(`[tether] 配对串(${Math.round(msg['expires_in_sec'] / 60)} 分钟内有效): ${endpointId}#${msg.code}`)
         break
       case 'pairing-closed':
-        console.log(`[mobile-remote] 配对窗口已关闭: ${msg.reason}`)
+        console.log(`[tether] 配对窗口已关闭: ${msg.reason}`)
         break
       case 'pairing-done':
-        console.log(`[mobile-remote] 配对成功: ${msg.name}(${msg.peer.slice(0, 16)}…)`)
+        console.log(`[tether] 配对成功: ${msg.name}(${msg.peer.slice(0, 16)}…)`)
         break
       case 'peer-connected':
-        console.log(`[mobile-remote] 手机已连接: ${msg.name}`)
+        console.log(`[tether] 手机已连接: ${msg.name}`)
         break
       case 'peer-path':
         console.log(msg.kind === 'direct'
-          ? `[mobile-remote] 连接路径: P2P 直连(NAT 打洞成功) ${msg.remote}`
-          : `[mobile-remote] 连接路径: relay 中转(打洞未成,可用但延迟略高) ${msg.remote}`)
+          ? `[tether] 连接路径: P2P 直连(NAT 打洞成功) ${msg.remote}`
+          : `[tether] 连接路径: relay 中转(打洞未成,可用但延迟略高) ${msg.remote}`)
         break
       case 'peer-disconnected':
-        console.log('[mobile-remote] 手机已断开')
+        console.log('[tether] 手机已断开')
         break
       default:
-        console.error(`[mobile-remote] 未知 sidecar 消息: ${line}`)
+        console.error(`[tether] 未知 sidecar 消息: ${line}`)
     }
   })
 
@@ -221,8 +221,8 @@ function injectNarrowScreenCss(html) {
   [class*="_frame"] > [class*="_handle"] { display: none !important; }
 
   /* 侧栏收起时是图标条,「主机」按钮的文字跟着藏起来,和 dsh 自己的按钮一致 */
-  [data-dsh-remote="hosts-label"] { display: none; }
-  [class*="_frame"]:has(> [class*="_handle"]) [data-dsh-remote="hosts-label"] { display: inline; }
+  [data-dsh-tether="hosts-label"] { display: none; }
+  [class*="_frame"]:has(> [class*="_handle"]) [data-dsh-tether="hosts-label"] { display: inline; }
   @media (prefers-reduced-motion: reduce) {
     [class*="_frame"] > [class*="sidebarCol"],
     [class*="_frame"]::after { transition: none; }
@@ -268,8 +268,8 @@ function injectNarrowScreenCss(html) {
   // 就地渲染文件内容——只读,想改仍然去电脑上改。
   function viewer(title, body, error) {
     var mask = document.createElement('div')
-    mask.setAttribute('data-dsh-remote', 'config-viewer')
-    mask.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:var(--dsh-remote-bg,#fff);display:flex;flex-direction:column;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;color:#0f1115'
+    mask.setAttribute('data-dsh-tether', 'config-viewer')
+    mask.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:var(--dsh-tether-bg,#fff);display:flex;flex-direction:column;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;color:#0f1115'
     if (matchMedia('(prefers-color-scheme: dark)').matches) mask.style.background = '#151517', mask.style.color = '#f9fafb'
     var bar = document.createElement('div')
     bar.style.cssText = 'flex:none;display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(128,128,128,.28)'
@@ -295,19 +295,19 @@ function injectNarrowScreenCss(html) {
   function mountHostsTrigger() {
     if (window.parent === window) return
     var slot = document.querySelector('[data-slot="sidebar.footer.action"]')
-    if (!slot || slot.querySelector('[data-dsh-remote="hosts-trigger"]')) return
+    if (!slot || slot.querySelector('[data-dsh-tether="hosts-trigger"]')) return
     var settings = document.querySelector('[data-slot="settings.trigger"]')
     var reference = settings && settings.closest ? settings.closest('button') : null
     if (!reference) return
     var button = document.createElement('button')
     button.type = 'button'
-    button.setAttribute('data-dsh-remote', 'hosts-trigger')
+    button.setAttribute('data-dsh-tether', 'hosts-trigger')
     button.setAttribute('aria-label', '主机')
     // 类名带内容哈希,照抄隔壁「设置」按钮当前的,外观自然一致
     button.className = reference.className
-    button.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg><span data-dsh-remote="hosts-label">主机</span>'
+    button.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg><span data-dsh-tether="hosts-label">主机</span>'
     button.addEventListener('click', function () {
-      window.parent.postMessage({ type: 'dsh-remote:open-hosts' }, '*')
+      window.parent.postMessage({ type: 'dsh-tether:open-hosts' }, '*')
     })
     slot.append(button)
     // 侧栏展开/收起时「设置」按钮会换类名(rail 与否),跟着同步
@@ -332,13 +332,13 @@ function injectNarrowScreenCss(html) {
 })()`
   return html.replace(
     '</head>',
-    `<style data-dsh-remote="narrow-screen">${css}\n</style><script data-dsh-remote="narrow-screen">${script}\n</script></head>`,
+    `<style data-dsh-tether="narrow-screen">${css}\n</style><script data-dsh-tether="narrow-screen">${script}\n</script></head>`,
   )
 }
 
 function defaultHostBinary() {
   const here = dirname(fileURLToPath(import.meta.url))
-  const exe = process.platform === 'win32' ? 'mobile-remote-host.exe' : 'mobile-remote-host'
+  const exe = process.platform === 'win32' ? 'tether-host.exe' : 'tether-host'
   return join(here, '..', 'target', 'debug', exe)
 }
 

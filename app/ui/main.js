@@ -74,7 +74,7 @@ function notifyApproval({ toolName, reason }) {
   if (!notifyAllowed) return
   notification.sendNotification({
     title: `等待你批准:${toolName || '一个操作'}`,
-    body: reason || '打开 DSH Remote 查看并批准',
+    body: reason || '打开 DSH Tether 查看并批准',
   })
 }
 
@@ -286,7 +286,7 @@ el('open-hosts').addEventListener('click', () => { refreshHosts(); showView('hos
 // 那个按钮在 iframe 里、跨源,只能经 postMessage 过来;只认 web UI 那个源。
 window.addEventListener('message', (e) => {
   if (webUiOrigin === null || e.origin !== webUiOrigin) return
-  if (e.data?.type !== 'dsh-remote:open-hosts') return
+  if (e.data?.type !== 'dsh-tether:open-hosts') return
   refreshHosts()
   showView('hosts')
 })
@@ -307,7 +307,7 @@ async function boot() {
   await listen('remote:approval', (e) => notifyApproval(e.payload))
   await ensureNotifyPermission()
   invoke('app_version')
-    .then((v) => { el('about-version').textContent = `DSH Remote v${v}` })
+    .then((v) => { el('about-version').textContent = `DSH Tether v${v}` })
     .catch(() => {})
   if (PROJECT_URL !== '') {
     const link = el('about-link')

@@ -1,4 +1,4 @@
-//! DSH Remote 手机端 Rust 核心:iroh 连接、配对、审批事件转发。
+//! DSH Tether 手机端 Rust 核心:iroh 连接、配对、审批事件转发。
 //!
 //! 前端只做渲染与两个按钮;连接生命周期全在这层。按「打开 app 时连接」设计,
 //! 无后台常驻(Android doze 语义下这是产品决定,不是缺陷)。
@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use anyhow::{bail, Context as _, Result};
 use iroh::endpoint::presets;
 use iroh::{Endpoint, EndpointId};
-use remote_core::{load_or_create_secret, read_line_bounded, write_line, Wire, ALPN, MAX_LINE};
+use tether_core::{load_or_create_secret, read_line_bounded, write_line, Wire, ALPN, MAX_LINE};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, Mutex};

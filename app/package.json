@@ -1,5 +1,5 @@
 {
-  "name": "dsh-remote-app-shell",
+  "name": "dsh-tether-app-shell",
   "private": true,
   "version": "0.1.0",
   "scripts": {

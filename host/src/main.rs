@@ -1,4 +1,4 @@
-//! mobile-remote-host:dsh 审批遥控的电脑侧 iroh 端。
+//! tether-host:dsh 审批遥控的电脑侧 iroh 端。
 //!
 //! `host` 模式作为 dsh 插件的 sidecar 运行:stdin/stdout 走 JSON-lines 与插件通信,
 //! stderr 只做人读日志;iroh 侧一条连接一条控制 bi 流,同样 JSON-lines。
@@ -17,7 +17,7 @@ use clap::{Parser, Subcommand};
 use iroh::endpoint::presets;
 use iroh::{Endpoint, EndpointId};
 use rand::Rng;
-use remote_core::{load_or_create_secret, read_line_bounded, write_line, Wire, ALPN, MAX_LINE, MAX_UNPAIRED_LINE};
+use tether_core::{load_or_create_secret, read_line_bounded, write_line, Wire, ALPN, MAX_LINE, MAX_UNPAIRED_LINE};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::{mpsc, Mutex};
@@ -26,7 +26,7 @@ const PAIRING_TTL: Duration = Duration::from_secs(600);
 const PAIRING_MAX_ATTEMPTS: u32 = 3;
 
 #[derive(Parser)]
-#[command(name = "mobile-remote-host", about = "dsh 审批遥控:电脑侧 iroh 端(插件 sidecar)与手机模拟端")]
+#[command(name = "tether-host", about = "dsh 审批遥控:电脑侧 iroh 端(插件 sidecar)与手机模拟端")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -138,7 +138,7 @@ async fn main() -> Result<()> {
             host_main(data_dir.unwrap_or_else(default_data_dir), pair, proxy_target).await?
         }
         Cmd::PhoneSim { proxy_listen, peer, code, name, auto, delay, data_dir } => {
-            let dir = data_dir.unwrap_or_else(|| default_data_dir_named("dsh-remote-phone-sim"));
+            let dir = data_dir.unwrap_or_else(|| default_data_dir_named("dsh-tether-phone-sim"));
             phone_sim_main(dir, peer, code, name, auto, delay, proxy_listen).await?
         }
     }
@@ -146,7 +146,7 @@ async fn main() -> Result<()> {
 }
 
 fn default_data_dir() -> PathBuf {
-    default_data_dir_named("dsh-remote")
+    default_data_dir_named("dsh-tether")
 }
 
 fn default_data_dir_named(name: &str) -> PathBuf {
