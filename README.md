@@ -1,4 +1,6 @@
-# DSH Tether
+<p align="center"><img src="assets/banner.png" alt="Phone tethered directly to a dev machine — no server in between" width="800"></p>
+
+<h1 align="center">DSH Tether</h1>
 
 [中文](README.zh.md)
 
@@ -68,8 +70,6 @@ Building the APK from source needs Node ^22.19 || >=24, Rust, and JDK 21 + Andro
 cd app && pnpm install
 pnpm exec tauri android build --apk --target aarch64
 ```
-
-Then open the app, paste the pairing string (`<host-id>#<code>`) from the `dsh web` output, and your machine's DSH appears on your phone.
 
 ## Verified
 

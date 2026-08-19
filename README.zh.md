@@ -1,4 +1,6 @@
-# DSH Tether
+<p align="center"><img src="assets/banner.png" alt="手机与开发机直接相连,中间没有服务器" width="800"></p>
+
+<h1 align="center">DSH Tether</h1>
 
 [English](README.md)
 
@@ -63,8 +65,6 @@ dsh plugin --profile web add .
 装 Release 里的 APK,打开后把 `dsh web` 打印的配对串(`<主机ID>#<配对码>`)整行粘进去。
 
 从源码构建 APK 需要 Node ^22.19 || >=24、Rust、JDK 21 + Android SDK/NDK(Windows 上可用 `scripts/setup-android-env.ps1` 装齐):
-
-构建手机 App:
 
 ```sh
 cd app && pnpm install
