@@ -21,6 +21,7 @@ const inject = ['webServer', 'settings']
 const CONFIG_DOCUMENT_PATH = '/dsh-tether/config-document'
 /** 按需开一个配对窗口,拿回配对串 */
 const PAIRING_PATH = '/dsh-tether/pairing'
+const DEVICES_PATH = '/dsh-tether/devices'
 
 /** dsh 的回环判定:localhost、IPv6 回环、以及整个 127/8 */
 function isLoopbackHostname(hostname) {
@@ -62,6 +63,24 @@ function isTrustedRequest(req) {
 }
 
 /** 未通过栅栏时统一的拒绝应答,和 dsh 的 /api 一样是裸 403,不泄露路由细节 */
+/** 读 POST body 里的 {"id": "..."};格式不对一律当作没给 */
+async function readForgetId(req) {
+  const chunks = []
+  let size = 0
+  for await (const chunk of req) {
+    size += chunk.length
+    // 请求体只可能是一个 64 位十六进制 id,超过这个量级就是异常输入
+    if (size > 4096) return undefined
+    chunks.push(chunk)
+  }
+  try {
+    const id = JSON.parse(Buffer.concat(chunks).toString('utf8')).id
+    return typeof id === 'string' && id !== '' ? id : undefined
+  } catch {
+    return undefined
+  }
+}
+
 function refuse(res) {
   res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' })
   res.end('forbidden')
@@ -97,6 +116,8 @@ function apply(ctx, config = {}) {
   let endpointId = ''
   /** 等着拿配对串的那个请求;sidecar 回 pairing 时兑现 */
   let pendingPairing
+  /** 等着拿设备列表的那些请求;sidecar 回 devices 时一并兑现 */
+  let pendingDevices = []
 
   createInterface({ input: child.stdout }).on('line', (line) => {
     let msg
@@ -138,6 +159,12 @@ function apply(ctx, config = {}) {
       case 'peer-disconnected':
         console.log('[tether] 手机已断开')
         break
+      case 'devices': {
+        const waiters = pendingDevices
+        pendingDevices = []
+        for (const w of waiters) w(msg.devices)
+        break
+      }
       default:
         console.error(`[tether] 未知 sidecar 消息: ${line}`)
     }
@@ -198,6 +225,43 @@ function apply(ctx, config = {}) {
       }
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
       res.end(JSON.stringify(result))
+    },
+  }))
+
+  // 白名单只增不减是个安全问题:手机每重装一次 App 就换一把身份密钥,旧的那把
+  // 仍留在白名单里持有访问权,而电脑端此前没有任何入口能看见或撤销它们。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: DEVICES_PATH,
+    handler: async (req, res) => {
+      if (!isTrustedRequest(req)) return refuse(res)
+      if (req.method === 'POST') {
+        const id = await readForgetId(req)
+        if (id === undefined) {
+          res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' })
+          res.end('缺少要移除的设备 id')
+          return
+        }
+        send({ type: 'device-forget', id })
+      } else {
+        send({ type: 'device-list' })
+      }
+      const devices = await new Promise((resolve) => {
+        pendingDevices.push(resolve)
+        setTimeout(() => {
+          const at = pendingDevices.indexOf(resolve)
+          if (at === -1) return
+          pendingDevices.splice(at, 1)
+          resolve(undefined)
+        }, 5000)
+      })
+      if (devices === undefined) {
+        res.writeHead(504, { 'content-type': 'text/plain; charset=utf-8' })
+        res.end('sidecar 没有在 5 秒内返回设备列表')
+        return
+      }
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+      res.end(JSON.stringify({ devices }))
     },
   }))
 

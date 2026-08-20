@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Context as _, Result};
 use clap::{Parser, Subcommand};
-use iroh::endpoint::presets;
+use iroh::endpoint::{presets, Connection};
 use iroh::{Endpoint, EndpointId};
 use rand::Rng;
 use tether_core::{load_or_create_secret, read_line_bounded, write_line, Wire, ALPN, MAX_LINE, MAX_UNPAIRED_LINE};
@@ -83,6 +83,8 @@ enum PluginIn {
     Approval { id: String, tool_name: String, reason: String },
     ApprovalCancel { id: String },
     PairingBegin,
+    DeviceList,
+    DeviceForget { id: String },
 }
 
 /// sidecar → 插件(stdout)
@@ -98,6 +100,8 @@ enum PluginOut {
     PeerPath { peer: String, kind: String, remote: String },
     PeerDisconnected { peer: String },
     Decision { id: String, outcome: String },
+    /// 已配对设备全量列表;online 标出此刻连着的那些
+    Devices { devices: Vec<DeviceView> },
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -112,18 +116,33 @@ struct PairedDevice {
     paired_at: String,
 }
 
+#[derive(Serialize)]
+struct DeviceView {
+    id: String,
+    name: String,
+    paired_at: String,
+    online: bool,
+}
+
 struct PairingWindow {
     code: String,
     deadline: tokio::time::Instant,
     attempts: u32,
 }
 
+/// 一台在线手机。连接句柄要留着:移除已配对设备时必须能主动断开它,
+/// 只丢下行队列不行——那只会结束 writer,reader 与代理接收仍挂在连接上。
+struct PeerConn {
+    tx: mpsc::Sender<String>,
+    conn: Connection,
+}
+
 struct HostState {
     store_path: PathBuf,
     store: PairedStore,
     pairing: Option<PairingWindow>,
-    /// 已连接手机的下行发送端(EndpointId 字符串 → 控制流写队列)
-    conns: HashMap<String, mpsc::Sender<String>>,
+    /// 在线手机(EndpointId 字符串 → 下行写队列 + 连接句柄)
+    conns: HashMap<String, PeerConn>,
 }
 
 #[tokio::main]
@@ -244,13 +263,44 @@ async fn stdin_loop(state: Arc<Mutex<HostState>>) {
                 emit(&PluginOut::Pairing { code: w.code.clone(), expires_in_sec: PAIRING_TTL.as_secs() });
                 s.pairing = Some(w);
             }
+            PluginIn::DeviceList => {
+                let s = state.lock().await;
+                emit(&PluginOut::Devices { devices: device_views(&s) });
+            }
+            PluginIn::DeviceForget { id } => {
+                let mut s = state.lock().await;
+                s.store.devices.retain(|d| d.id != id);
+                let (path, store) = (s.store_path.clone(), &s.store);
+                if let Err(e) = save_store(&path, store) {
+                    eprintln!("[host] 写入配对白名单失败: {e:#}");
+                }
+                // 移出白名单只挡下次连接。此刻正连着的那条必须主动断,
+                // 否则「移除」在设备下线前完全不生效。
+                if let Some(peer) = s.conns.remove(&id) {
+                    peer.conn.close(1u8.into(), b"forgotten");
+                }
+                emit(&PluginOut::Devices { devices: device_views(&s) });
+            }
         }
     }
 }
 
+fn device_views(s: &HostState) -> Vec<DeviceView> {
+    s.store
+        .devices
+        .iter()
+        .map(|d| DeviceView {
+            id: d.id.clone(),
+            name: d.name.clone(),
+            paired_at: d.paired_at.clone(),
+            online: s.conns.contains_key(&d.id),
+        })
+        .collect()
+}
+
 async fn broadcast(state: &Arc<Mutex<HostState>>, line: String) {
     let s = state.lock().await;
-    for tx in s.conns.values() {
+    for PeerConn { tx, .. } in s.conns.values() {
         let _ = tx.try_send(line.clone());
     }
 }
@@ -327,7 +377,7 @@ async fn handle_phone(
     let (tx, mut rx) = mpsc::channel::<String>(64);
     {
         let mut s = state.lock().await;
-        s.conns.insert(remote.clone(), tx);
+        s.conns.insert(remote.clone(), PeerConn { tx, conn: conn.clone() });
     }
     emit(&PluginOut::PeerConnected { peer: remote.clone(), name: device_name });
 
