@@ -19,6 +19,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2EA44F?style=flat" alt="MIT"></a>
   <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7">
   <img src="https://img.shields.io/badge/Android-4493F8?style=flat" alt="Android">
+  <a href="https://linux.do/"><img src="https://img.shields.io/badge/%E7%A4%BE%E5%8C%BA-LINUX%20DO-4D6BFE?style=flat" alt="LINUX DO"></a>
 </p>
 
 <p align="center">
@@ -135,6 +136,10 @@ cargo build --release -p tether-host          # the machine-side sidecar
 cd app && pnpm install
 pnpm exec tauri android build --apk --target aarch64
 ```
+
+## Links
+
+- [LINUX DO](https://linux.do) — where this project is shared
 
 ## License
 
