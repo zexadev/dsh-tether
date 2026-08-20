@@ -2,6 +2,17 @@
 
 <h1 align="center">DSH Tether</h1>
 
+<p align="center">
+  <img src="assets/dsh-mark.svg" height="16" align="top" alt="">
+  为 <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> 打造的第三方社区项目 · 非官方
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-0f1115?style=flat-square" alt="MIT">
+  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7-8FA6F0?style=flat-square" alt="dsh 0.1.0-rc.7">
+  <img src="https://img.shields.io/badge/Android-8+-81858c?style=flat-square" alt="Android">
+</p>
+
 [English](README.md)
 
 **在手机上连回你开发机上的 DeepSeek Harness —— 跨网络,不经过任何服务器。不用配 relay,不用同一个 WiFi,不用 Termux。**
@@ -10,14 +21,13 @@ agent 留在你代码所在的那台机器上跑。手机拿到的是真东西:D
 
 > 状态:能用,尚早。传输层的跨网能力已验证,具体验到哪一步见 [实测](#实测)。
 
-## 和别的客户端有什么不同
+## 它解决的是哪一种情况
 
-DSH 的手机客户端已经有九个。除了这个,另外两个值得你知道,也该知道什么时候该选它们:
+**你不在电脑那个网络里,又不想中间有一台服务器。**
 
-- **[sorsama/deepseek-harness-mobile](https://github.com/sorsama/deepseek-harness-mobile)** —— Kotlin/Compose 写的成熟客户端,功能比这个全,还有 11 种语言。**如果你只在和电脑同一个 WiFi 下用手机,请直接用它。** 它自己的 README 就写明范围是局域网。
-- **[april-jk/dsh-mobile-plugin](https://github.com/april-jk/dsh-mobile-plugin)** —— 同样是插件形态的架构,跨网也确实能用。区别在于它要过一台 relay:得你自己部署、配置,并且信任它。
+手机连回自己开发机,常见的做法要么要求两端在同一个局域网,要么要求你自己部署并信任一台中转。这个项目两样都不要:两端靠 [iroh](https://www.iroh.computer/) 直接打洞,打通之后流量不经过任何第三方;打不通才退回 relay,而 relay 上过的也只是它读不懂的密文。
 
-这个项目只解决剩下那种情况:**你不在电脑那个网络里,又不想中间有一台服务器。**
+如果你只在和电脑同一个 WiFi 下用手机,你并不需要这些——局域网方案更简单。
 
 ## 工作方式
 
@@ -75,7 +85,7 @@ pnpm exec tauri android build --apk --target aarch64
 
 ## 实测
 
-针对 dsh **`0.1.0-rc.7`** 验证(生态已经分叉:桌面版 pin rc.7,april-jk pin rc.6,本项目是 rc.7)。
+针对 dsh **`0.1.0-rc.7`** 验证。dsh 处于 developer preview,本项目按这个确切版本 pin 死——换更新的 dsh 之前先看这一行。
 
 | | |
 |---|---|

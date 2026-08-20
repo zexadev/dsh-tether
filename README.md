@@ -2,6 +2,17 @@
 
 <h1 align="center">DSH Tether</h1>
 
+<p align="center">
+  <img src="assets/dsh-mark.svg" height="16" align="top" alt="">
+  A third-party community project for <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> · not official
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-0f1115?style=flat-square" alt="MIT">
+  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7-8FA6F0?style=flat-square" alt="dsh 0.1.0-rc.7">
+  <img src="https://img.shields.io/badge/Android-8+-81858c?style=flat-square" alt="Android">
+</p>
+
 [中文](README.zh.md)
 
 **Reach the DeepSeek Harness running on your dev machine from your phone — across networks, through no server at all. No relay to configure, no shared Wi-Fi, no Termux.**
@@ -10,14 +21,13 @@ Your agent keeps running where your code is. The phone gets the real thing: DSH'
 
 > Status: working, early. Cross-network use is verified for the transport; see [Verified](#verified) for exactly what has and has not been tested.
 
-## How it differs
+## The case it solves
 
-Nine mobile clients exist for DSH. Two are worth your attention besides this one, and you should know when to prefer them:
+**You are not on your machine's network, and you do not want a server in the middle.**
 
-- **[sorsama/deepseek-harness-mobile](https://github.com/sorsama/deepseek-harness-mobile)** — a polished Kotlin/Compose client with more features and 11 languages than this has. **If you only ever use your phone on the same Wi-Fi as your machine, use it instead.** Its own README scopes it to your local network.
-- **[april-jk/dsh-mobile-plugin](https://github.com/april-jk/dsh-mobile-plugin)** — same plugin-shaped architecture, and it does work across networks. The difference is that it routes through a relay you must deploy, configure, and trust.
+Reaching your own dev machine from a phone usually asks for one of two things: both ends on the same LAN, or a relay you deploy, configure and trust. This asks for neither. The two ends hole-punch to each other through [iroh](https://www.iroh.computer/), and once they do, nothing passes through a third party; the fallback relay only ever carries ciphertext it cannot read.
 
-This one exists for the remaining case: **you are not on your machine's network, and you do not want a server in the middle.**
+If you only use your phone on the same Wi-Fi as your machine, you don't need any of this — a LAN setup is simpler.
 
 ## How it works
 
@@ -39,7 +49,7 @@ Approvals are answered by DSH's own web UI on your phone — this plugin deliber
 - Traffic is end-to-end encrypted by iroh (QUIC/TLS) and, when hole-punching succeeds, never touches a third party. The fallback relay carries only ciphertext it cannot read.
 - The app permits cleartext HTTP to `127.0.0.1` only — that is the local end of the tunnel, not the network.
 - The plugin's own two routes (view the config document, mint a pairing code on demand) apply the same browser-trust rules dsh applies to `/api`: the `Host` must be a loopback authority, an explicit cross-site marker is refused, and an attached `Origin` must match the Host. Cross-site requests from a malicious page and DNS-rebinding attempts both get a 403.
-- **Known limit**: those rules stop a browser from being used as a confused deputy; they do **not** stop a local process. A local `curl` presents a loopback `Host`, so it can mint a pairing code and pair itself as a "phone" — meaning **an attacker who can already run code on your dev machine can turn that into long-term access**. Closing it requires printing the code to the terminal only, never returning it over HTTP; that trade was not made so the desktop side can offer copy-to-clipboard. Don't run this plugin on a machine where you run untrusted code.
+- **Known limit**: those rules stop a browser from being used as a confused deputy; they do **not** stop a local process. A local `curl` presents a loopback `Host`, so it can mint a pairing code and pair itself as a "phone" — meaning **an attacker who can already run code on your dev machine can turn that into long-term access**. Closing it requires printing the code to the terminal only, never returning it over HTTP; that trade was not made so the computer side can offer copy-to-clipboard. Don't run this plugin on a machine where you run untrusted code.
 
 ## Install
 
@@ -73,7 +83,7 @@ pnpm exec tauri android build --apk --target aarch64
 
 ## Verified
 
-Tested against **dsh `0.1.0-rc.7`** (the ecosystem has split — the desktop client pins rc.7, april-jk pins rc.6; this one is rc.7).
+Tested against **dsh `0.1.0-rc.7`**. dsh is in developer preview and its packages are pinned to that exact version — check this line before assuming a newer dsh works.
 
 | | |
 |---|---|
