@@ -419,7 +419,7 @@ function injectNarrowScreenCss(html) {
   // 就地渲染文件内容——只读,想改仍然去电脑上改。
   // 色值/圆角/字重全部取自 dsh 自身的实测计算值,别在人家界面里插一块不一样的东西。
   // 窄屏铺满一屏,宽屏收成居中卡片——和 dsh 的弹窗一个做法。
-  function viewer(title, body, error) {
+  function viewer(title, body, error, extraFactory) {
     var dark = matchMedia('(prefers-color-scheme: dark)').matches
     var t = dark
       ? { fg: '#f9fafb', surface: '#2c2c2e', line: 'rgba(255,255,255,.12)', muted: '#adb2b8', danger: '#f5766b' }
@@ -472,6 +472,7 @@ function injectNarrowScreenCss(html) {
     pre.textContent = error ? error : body
 
     card.append(bar, pre)
+    if (extraFactory) card.append(extraFactory(t, slim))
     mask.append(card)
     // 宽屏点遮罩关闭,窄屏没有遮罩可点
     if (!narrow.matches) mask.addEventListener('click', function (e) { if (e.target === mask) mask.remove() })
@@ -484,6 +485,90 @@ function injectNarrowScreenCss(html) {
   // 好让用户换手机、加设备时有地方拿新配对码(否则只能去删 paired.json)。
   var framed = window.parent !== window
 
+  // 已配对手机列表。白名单每条都持有访问权,而手机重装 App 会换身份密钥,
+  // 旧条目就此变成没人认识的常驻凭证——这里是撤销它们的地方。
+  function devicesBlock(t, slim) {
+    var box = document.createElement('div')
+    box.style.cssText = 'flex:none;border-top:1px solid ' + t.line + ';padding:12px 16px 14px'
+    var head = document.createElement('div')
+    head.style.cssText = 'font-size:12px;color:' + t.muted + ';padding-bottom:8px'
+    head.textContent = '已配对的手机'
+    var list = document.createElement('div')
+    box.append(head, list)
+
+    function render(devices) {
+      list.textContent = ''
+      if (!devices.length) {
+        var none = document.createElement('div')
+        none.style.cssText = 'font-size:12px;color:' + t.muted
+        none.textContent = '还没有手机配对过'
+        list.append(none)
+        return
+      }
+      devices.forEach(function (d) {
+        var row = document.createElement('div')
+        row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:7px 0'
+        var dot = document.createElement('span')
+        dot.style.cssText = 'flex:none;width:7px;height:7px;border-radius:50%;background:'
+          + (d.online ? '#12b76a' : t.line)
+        dot.title = d.online ? '在线' : '离线'
+        var label = document.createElement('div')
+        label.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+        label.textContent = d.name
+        var idTag = document.createElement('span')
+        idTag.style.cssText = 'font-size:12px;color:' + t.muted
+          + ';font-family:ui-monospace,"SF Mono",Consolas,monospace;padding-left:8px'
+        idTag.textContent = d.id.slice(0, 8)
+        label.append(idTag)
+        // 不用原生 confirm:第一下改文案,第二下才真删
+        var drop = document.createElement('button')
+        drop.textContent = '移除'
+        drop.style.cssText = slim
+        var armed = false
+        drop.addEventListener('click', function () {
+          if (!armed) {
+            armed = true
+            drop.textContent = '确认移除?'
+            drop.style.color = t.danger
+            setTimeout(function () {
+              if (!armed) return
+              armed = false
+              drop.textContent = '移除'
+              drop.style.color = 'inherit'
+            }, 4000)
+            return
+          }
+          drop.disabled = true
+          drop.textContent = '移除中'
+          fetch('${DEVICES_PATH}', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ id: d.id }),
+          })
+            .then(function (r) { return r.ok ? r.json() : r.text().then(function (x) { throw new Error(x) }) })
+            .then(function (x) { render(x.devices) })
+            .catch(function (e) {
+              drop.disabled = false
+              drop.textContent = '移除失败'
+              console.error('[dsh-tether] 移除设备失败', e)
+            })
+        })
+        row.append(dot, label, drop)
+        list.append(row)
+      })
+    }
+
+    var loading = document.createElement('div')
+    loading.style.cssText = 'font-size:12px;color:' + t.muted
+    loading.textContent = '读取中…'
+    list.append(loading)
+    fetch('${DEVICES_PATH}')
+      .then(function (r) { return r.ok ? r.json() : r.text().then(function (x) { throw new Error(x) }) })
+      .then(function (x) { render(x.devices) })
+      .catch(function (e) { loading.textContent = '读取失败: ' + (e && e.message ? e.message : e) })
+    return box
+  }
+
   function showPairing() {
     fetch('${PAIRING_PATH}')
       .then(function (r) { return r.ok ? r.json() : r.text().then(function (t) { throw new Error(t) }) })
@@ -491,6 +576,8 @@ function injectNarrowScreenCss(html) {
         viewer(
           '在手机上「添加电脑」里粘贴整行,' + Math.round(d.expiresInSec / 60) + ' 分钟内有效',
           d.pairingString,
+          undefined,
+          devicesBlock,
         )
       })
       .catch(function (e) { viewer('配对', '', String(e && e.message ? e.message : e)) })
