@@ -25,6 +25,9 @@ jobs:
           # x86_64 目标改在 Apple Silicon runner 上交叉编译,同一套 macOS SDK
           - { name: darwin-x64, os: macos-latest, target: x86_64-apple-darwin }
           - { name: linux-x64, os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          # 主包的 optionalDependencies 列了 linux-arm64,矩阵里就必须有它:
+          # 缺的平台子包在安装时被静默跳过,用户要到运行时才发现二进制不存在
+          - { name: linux-arm64, os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu }
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
