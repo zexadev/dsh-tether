@@ -1,23 +1,33 @@
-<p align="center"><img src="assets/banner.jpg" alt="Phone tethered directly to a dev machine — no server in between" width="800"></p>
-
 <h1 align="center">DSH Tether</h1>
 
 <p align="center">
-  <img src="assets/dsh-mark.svg" height="16" align="top" alt="">
-  A third-party community project for <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> · not official
+  <strong>Use the DeepSeek Harness on your dev machine, from your phone.</strong><br>
+  Across networks, peer to peer, through no server at all.<br>
+  No relay to configure, no shared Wi-Fi, no Linux on your phone.
+</p>
+
+<p align="center"><sub>An independent community project. Not affiliated with, partnered with, authorised by, or endorsed by DeepSeek.<br>No DeepSeek employee or upstream DeepSeek Harness team member is involved in this repository.<br><a href="README.zh.md">中文</a> · English</sub></p>
+
+<p align="center">
+  <img src="assets/banner.jpg" alt="Phone tethered directly to a dev machine — no server in between" width="100%">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/license-MIT-0f1115?style=flat-square" alt="MIT">
-  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7-8FA6F0?style=flat-square" alt="dsh 0.1.0-rc.7">
-  <img src="https://img.shields.io/badge/Android-8+-81858c?style=flat-square" alt="Android">
+  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/zexadev/dsh-tether?style=flat&label=release&color=4D6BFE" alt="Latest release"></a>
+  <a href="../../releases"><img src="https://img.shields.io/github/downloads/zexadev/dsh-tether/total?style=flat&label=downloads&color=4D6BFE" alt="Downloads"></a>
+  <a href="../../stargazers"><img src="https://img.shields.io/github/stars/zexadev/dsh-tether?style=flat&label=%E2%98%85&color=08C" alt="Stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2EA44F?style=flat" alt="MIT"></a>
+  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7">
+  <img src="https://img.shields.io/badge/Android-4493F8?style=flat" alt="Android">
 </p>
 
-[中文](README.zh.md)
+<p align="center">
+  <img src="assets/phone-cellular.png" width="240" alt="A DSH session on the phone">
+  <img src="assets/phone-sidebar-drawer.png" width="240" alt="The sidebar as an overlay drawer">
+  <img src="assets/phone-settings.png" width="240" alt="Settings laid out for a phone">
+</p>
 
-**Use the DeepSeek Harness on your dev machine from your phone. Across networks, through no server at all.**
-
-The agent keeps running on the machine your code lives on. Your phone gets DSH's own full interface, delivered over a direct P2P connection — pair once with a 6-digit code, and after that the two ends find each other whatever network they are on.
+DSH Tether carries the [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web interface to your phone over a direct peer-to-peer connection. The agent keeps running on the machine your code lives on, and the phone gets DSH's own full interface — conversations, tool calls, approvals and settings, not a reimplementation of them. Pair once with a 6-digit code; after that the two ends find each other whatever network they are on.
 
 ## The case it solves
 
@@ -27,31 +37,17 @@ Reaching your own dev machine from a phone usually asks for one of two things: b
 
 If you only use your phone on the same Wi-Fi as your machine, you don't need any of this — a LAN setup is simpler.
 
-## What it looks like
+## Download and install
 
-<p align="center">
-  <img src="assets/phone-cellular.png" width="240" alt="A DSH session on the phone">
-  <img src="assets/phone-sidebar-drawer.png" width="240" alt="The sidebar as an overlay drawer">
-  <img src="assets/phone-settings.png" width="240" alt="Settings laid out for a phone">
-</p>
+| Where | Download | How |
+| --- | --- | --- |
+| Machine (plugin) | — | `dsh plugin --profile web add github:zexadev/dsh-tether` |
+| Machine (sidecar) | `dsh-tether-host-<platform>-<version>.tgz` from the [Release](../../releases/latest) | `dsh plugin --profile web add ./that-file.tgz` |
+| Phone | `app-universal-release.apk` from the [Release](../../releases/latest) | Signed — install it directly |
 
-What runs on your phone is DSH's own interface, not a reimplementation of it: conversations, tool calls, approvals and settings are all there. Narrow screens get adjustments — the sidebar becomes an overlay drawer, the settings dialog puts its navigation on top, and content takes the full width.
+The sidecar is a small Rust binary the plugin drives; it owns the iroh connection. **It currently ships with each Release and is not on npm yet**, so it needs that one extra step; once it is published, the first command alone will do.
 
-## Install
-
-### 1. The plugin, on your machine
-
-```sh
-dsh plugin --profile web add github:zexadev/dsh-tether
-```
-
-The plugin carries a small Rust sidecar that owns the iroh connection. **Platform binaries currently ship with each [Release](../../releases) and are not on npm yet**, so add the one for your platform too — download `dsh-tether-host-<platform>-<version>.tgz`, then:
-
-```sh
-dsh plugin --profile web add ./dsh-tether-host-win32-x64-0.1.0.tgz
-```
-
-Or build it from source (needs Rust):
+You can also build the sidecar from source (needs Rust):
 
 ```sh
 git clone https://github.com/zexadev/dsh-tether && cd dsh-tether
@@ -59,37 +55,40 @@ cargo build --release -p tether-host
 dsh plugin --profile web add .
 ```
 
-### 2. The app, on your phone
+## Pair
 
-Download `app-universal-release.apk` from the [Release](../../releases). It is signed; install it directly.
+Start `dsh web` as you normally would, then click **Connect phone** at the bottom of the sidebar. You get one line to copy:
 
-### 3. Pair
-
-Start dsh as you normally would:
-
-```sh
-dsh web
-```
-
-At the bottom of the sidebar, click **Connect phone**. You get one line to copy:
-
-<p align="center"><img src="assets/pc-pairing.png" width="560" alt="The pairing string, shown on the computer"></p>
+<p align="center"><img src="assets/pc-pairing.png" width="620" alt="The pairing string, shown on the computer"></p>
 
 On the phone, open DSH Tether → **Add computer** → paste that whole line → name the computer → connect.
 
 From then on the app connects by itself when you open it.
 
-## New phone, second device
+## Features
 
-**Connect phone** in the computer's sidebar mints a fresh pairing code any time; it is valid for 10 minutes.
-
-**My computers** at the bottom of the phone's sidebar is your own page: every computer you have paired lives there, and you can switch, rename, remove, or add another — changing machines never means re-entering credentials.
-
-<p align="center"><img src="assets/phone-hosts.png" width="240" alt="The saved computers list on the phone"></p>
-
-## Notifications
-
-When the agent is waiting on your approval, the phone raises a system notification. You approve inside DSH's own interface — this plugin deliberately does not answer approvals for you; it only carries "it's waiting for you" to your lock screen, which is the one thing a web page in your pocket cannot do for itself.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Direct across networks</h3>
+      <p>The two ends hole-punch to each other through iroh, and once connected nothing passes through a third party. Phone on 4G/5G and machine on home broadband works — no public IP, no tunnel service, no relay of your own. Only a failed hole-punch falls back to a relay, which carries ciphertext it cannot read.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>DSH's own interface</h3>
+      <p>What runs on your phone is DSH's own web interface, not a reimplementation: conversations, tool calls, approvals and settings are all there. Narrow screens get adjustments — the sidebar becomes an overlay drawer, the settings dialog puts its navigation on top, and content takes the full width.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Several machines</h3>
+      <p><em>My computers</em>, at the bottom of the phone's sidebar, keeps every machine you have paired: switch, rename, remove, or add another. Changing machines never means re-entering credentials, and <em>Connect phone</em> on the computer mints a fresh code any time.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>Approval notifications</h3>
+      <p>When the agent is waiting on your approval, the phone raises a system notification. You approve inside DSH's own interface — this plugin deliberately does not answer approvals for you; it only carries "it's waiting for you" to your lock screen.</p>
+    </td>
+  </tr>
+</table>
 
 ## Security
 
@@ -108,16 +107,23 @@ When the agent is waiting on your approval, the phone raises a system notificati
 
 ## What has been verified
 
-Direct cross-network connection is the whole point of the project, so here is the evidence rather than the claim. With the phone's Wi-Fi off and only 5G, and the machine on home broadband, the plugin reported:
+Direct cross-network connection is the whole point of the project, so here is the evidence rather than the claim. With the phone's Wi-Fi off and only 5G, and the machine on home broadband, the plugin reported a public address on the selected path — meaning the two ends punched through to each other and the relay was never used. The first screenshot above is the phone rendering DSH over that path; note the absent Wi-Fi icon in its status bar.
 
-```
-[tether] 手机已连接: 我的手机
-[tether] 连接路径: P2P 直连(NAT 打洞成功) Ip(…:41341)
-```
+Pairing (including a wrong code being refused), approval delivery, and switching between saved machines were all verified on a real device. **The relay fallback has not yet been triggered on a real network.**
 
-A public address on the selected path means the two ends punched through to each other; the relay was never used. The first screenshot above is the phone rendering DSH over that path — note the absent Wi-Fi icon in its status bar.
+## Relationship to DeepSeek Harness
 
-Pairing (including a wrong code being refused), approval delivery, and switching between saved computers were all verified on a real device. **The relay fallback has not yet been triggered on a real network.**
+<p align="center"><img src="assets/dsh-mark.svg" height="36" alt="DeepSeek Harness"></p>
+
+DSH Tether is an independent community project built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) and its Cordis plugin mechanism. It **does not modify upstream source**: a pinned dsh runs unmodified, and this project joins it as an ordinary DSH plugin using only officially published extension points.
+
+This repository is maintained independently by the community. It is not affiliated with, partnered with, authorised by, or endorsed by DeepSeek, and no DeepSeek employee or upstream team member is involved in its development, maintenance or governance. The DeepSeek Harness mark used in this README identifies the upstream this project serves; it does not imply any authorisation or endorsement. The phone app icon derives from that same upstream mark.
+
+Upstream provides the agent capabilities, the plugin system and the web interface. This project provides:
+
+- the peer-to-peer connection and pairing between machine and phone
+- carrying that web interface to the phone, with a narrow-screen fit
+- multi-machine management and system notifications on the phone
 
 ## Building from source
 
