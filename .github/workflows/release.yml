@@ -127,16 +127,22 @@ jobs:
           done
           find dist -name '*.apk' -exec cp {} upload/ \;
           ls -la upload/
+      # Release 说明取自 CHANGELOG.md 对应版本那一节,而不是自动生成的提交列表:
+      # 提交信息是写给维护者看的,发布说明是写给用户看的,两者受众不同。
+      # 自动生成的内容仍然保留,会附在这段之后。
+      - uses: actions/checkout@v4
+        with: { path: repo }
+      - name: 取出本版更新日志
+        run: node repo/scripts/changelog-section.mjs "${GITHUB_REF_NAME#v}" release-notes.md
       - uses: softprops/action-gh-release@v2
         with:
           files: upload/*
+          body_path: release-notes.md
           generate_release_notes: true
 
       # 发 npm。平台子包必须先于主包发布:主包的 optionalDependencies 指向它们,
       # 顺序反了会有一段时间装到「主包在、二进制拿不到」的状态。
       # 已存在的版本跳过而不是整条失败——重跑同一个 tag 时要能安全收敛。
-      - uses: actions/checkout@v4
-        with: { path: repo }
       - uses: actions/setup-node@v4
         with: { node-version: '22', registry-url: 'https://registry.npmjs.org' }
       - name: 发布到 npm

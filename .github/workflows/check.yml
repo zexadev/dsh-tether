@@ -28,3 +28,4 @@ jobs:
           node --check index.js
           node --check app/ui/main.js
           node --check scripts/pack-host.mjs
+          node --check scripts/changelog-section.mjs
