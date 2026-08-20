@@ -67,7 +67,7 @@ jobs:
           echo "NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android
+          targets: aarch64-linux-android, armv7-linux-androideabi, i686-linux-android, x86_64-linux-android
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: app/src-tauri -> target
@@ -88,8 +88,22 @@ jobs:
           keyAlias=$KEY_ALIAS
           password=$KEY_PASSWORD
           EOF
-      - run: pnpm exec tauri android build --apk --target aarch64
+      # 不带 --target 即四个 ABI 全建;--split-per-abi 让 flavor 名变成真实的
+      # ABI 名。不拆分时 gradle 把产物叫 "universal",而它只含实际构建出的
+      # 那些 ABI——名字与内容不符,发到 Release 上会误导人。
+      - run: pnpm exec tauri android build --apk --split-per-abi
         working-directory: app
+      # gradle 产出的名字形如 app-<abi>-release.apk:前缀是模块名,且不含版本号。
+      # Release 页面上「我下的是哪一版」应当能从文件名看出来,所以在这里统一
+      # 重命名为 dsh-tether-<版本>-<abi>.apk,版本号取自根 package.json。
+      - name: APK 改名
+        run: |
+          version=$(node -p "require('./package.json').version")
+          find app/src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | while read -r f; do
+            abi=$(basename "$(dirname "$(dirname "$f")")")
+            mv "$f" "$(dirname "$f")/dsh-tether-$version-$abi.apk"
+          done
+          ls -la app/src-tauri/gen/android/app/build/outputs/apk/*/release/*.apk
       - uses: actions/upload-artifact@v4
         with:
           name: apk
