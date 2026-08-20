@@ -104,7 +104,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with: { path: dist }
-      # 平台子包打成 tgz 挂在 Release 上;npm publish 需要 token,留给人工决定何时发
+      # 平台子包打成 tgz:既挂在 Release 上,也是 npm publish 的输入
       - name: 打包平台子包
         run: |
           mkdir -p upload
@@ -117,3 +117,28 @@ jobs:
         with:
           files: upload/*
           generate_release_notes: true
+
+      # 发 npm。平台子包必须先于主包发布:主包的 optionalDependencies 指向它们,
+      # 顺序反了会有一段时间装到「主包在、二进制拿不到」的状态。
+      # 已存在的版本跳过而不是整条失败——重跑同一个 tag 时要能安全收敛。
+      - uses: actions/checkout@v4
+        with: { path: repo }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', registry-url: 'https://registry.npmjs.org' }
+      - name: 发布到 npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          publish() {
+            local dir="$1"
+            local name version
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "跳过 $name@$version(已在 npm 上)"
+            else
+              npm publish "./$dir" --access public
+            fi
+          }
+          for d in dist/host-*/; do publish "${d%/}"; done
+          publish repo
