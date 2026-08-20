@@ -60,8 +60,6 @@ dsh plugin --profile web add .
 
 电脑上照常启动 `dsh web`,在侧栏底部点**「连接手机」**,会给出一行配对串:
 
-<p align="center"><img src="assets/pc-pairing.png" width="620" alt="电脑上出示配对串"></p>
-
 手机上打开 DSH Tether →「添加电脑」→ 把那一整行粘进去 → 给这台电脑起个名字 → 连接。
 
 之后每次打开 App 自动连上,不用再配对。

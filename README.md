@@ -60,8 +60,6 @@ dsh plugin --profile web add .
 
 Start `dsh web` as you normally would, then click **Connect phone** at the bottom of the sidebar. You get one line to copy:
 
-<p align="center"><img src="assets/pc-pairing.png" width="620" alt="The pairing string, shown on the computer"></p>
-
 On the phone, open DSH Tether → **Add computer** → paste that whole line → name the computer → connect.
 
 From then on the app connects by itself when you open it.
