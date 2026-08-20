@@ -41,11 +41,10 @@ DSH Tether 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harnes
 
 | 装在哪 | 下载 | 安装方式 |
 | --- | --- | --- |
-| 电脑(插件) | — | `dsh plugin --profile web add github:zexadev/dsh-tether` |
-| 电脑(sidecar) | [Release](../../releases/latest) 里的 `dsh-tether-host-<平台>-<版本>.tgz` | `dsh plugin --profile web add ./下载到的.tgz` |
+| 电脑 | — | `dsh plugin --profile web add dsh-plugin-tether` |
 | 手机 | [Release](../../releases/latest) 里的 `app-universal-release.apk` | 已签名,直接安装 |
 
-sidecar 是插件带的一个 Rust 二进制,负责 iroh 连接。**它目前随 Release 分发,尚未发布到 npm**,所以要单独装一次;发布到 npm 之后第一条命令就够了。
+插件带一个 Rust 写的 sidecar 负责 iroh 连接,按平台拆成独立子包;安装时只会下载与你系统匹配的那一个,不用手动选。
 
 也可以从源码构建 sidecar(需要 Rust):
 

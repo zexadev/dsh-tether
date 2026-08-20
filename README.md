@@ -41,11 +41,10 @@ If you only use your phone on the same Wi-Fi as your machine, you don't need any
 
 | Where | Download | How |
 | --- | --- | --- |
-| Machine (plugin) | — | `dsh plugin --profile web add github:zexadev/dsh-tether` |
-| Machine (sidecar) | `dsh-tether-host-<platform>-<version>.tgz` from the [Release](../../releases/latest) | `dsh plugin --profile web add ./that-file.tgz` |
+| Machine | — | `dsh plugin --profile web add dsh-plugin-tether` |
 | Phone | `app-universal-release.apk` from the [Release](../../releases/latest) | Signed — install it directly |
 
-The sidecar is a small Rust binary the plugin drives; it owns the iroh connection. **It currently ships with each Release and is not on npm yet**, so it needs that one extra step; once it is published, the first command alone will do.
+The plugin carries a small Rust sidecar that owns the iroh connection, shipped as one package per platform; installing pulls only the one matching your system, with nothing to choose.
 
 You can also build the sidecar from source (needs Rust):
 
