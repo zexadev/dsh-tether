@@ -46,7 +46,7 @@ DSH Tether 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harnes
 
 插件带一个 Rust 写的 sidecar 负责 iroh 连接,按平台拆成独立子包;安装时只会下载与你系统匹配的那一个,不用手动选。
 
-手机端按 CPU 架构分了四个包,**近十年的安卓手机都选 `arm64`**;`armv7` 给 32 位老设备,`x86` / `x86_64` 给模拟器和 ChromeOS。装错了系统会直接拒绝安装,不会装出问题。
+手机端按 CPU 架构分了四个包,**近十年的安卓手机都选 `arm64`**;`arm` 给 32 位老设备,`x86` / `x86_64` 给模拟器和 ChromeOS。装错了系统会直接拒绝安装,不会装出问题。
 
 也可以从源码构建 sidecar(需要 Rust):
 

@@ -46,7 +46,7 @@ If you only use your phone on the same Wi-Fi as your machine, you don't need any
 
 The plugin carries a small Rust sidecar that owns the iroh connection, shipped as one package per platform; installing pulls only the one matching your system, with nothing to choose.
 
-The phone build is split by CPU architecture. **Any Android phone from the last decade takes `arm64`**; `armv7` is for 32-bit legacy devices, and `x86` / `x86_64` are for emulators and ChromeOS. Picking the wrong one simply gets refused at install time.
+The phone build is split by CPU architecture. **Any Android phone from the last decade takes `arm64`**; `arm` is for 32-bit legacy devices, and `x86` / `x86_64` are for emulators and ChromeOS. Picking the wrong one simply gets refused at install time.
 
 You can also build the sidecar from source (needs Rust):
 
