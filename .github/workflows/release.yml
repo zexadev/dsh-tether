@@ -1,6 +1,6 @@
 ## 发布流水线:打 tag 时构建各平台 sidecar 与 APK,汇总进一个 Release。
-## sidecar 必须在各自的目标系统上原生构建——Windows 编不出 macOS,
-## 而 tether-host 依赖 iroh 的原生加密后端,交叉编译得不偿失。
+## sidecar 按目标系统分发到对应 runner:Windows 与 Linux 各自原生构建,
+## 两个 macOS 目标同在 Apple Silicon runner 上(x86_64 走交叉编译)。
 name: release
 
 on:
@@ -21,7 +21,9 @@ jobs:
         include:
           - { name: win32-x64, os: windows-latest, target: x86_64-pc-windows-msvc }
           - { name: darwin-arm64, os: macos-latest, target: aarch64-apple-darwin }
-          - { name: darwin-x64, os: macos-13, target: x86_64-apple-darwin }
+          # macos-13(Intel)镜像已退役,标签解析不到会永远排队;
+          # x86_64 目标改在 Apple Silicon runner 上交叉编译,同一套 macOS SDK
+          - { name: darwin-x64, os: macos-latest, target: x86_64-apple-darwin }
           - { name: linux-x64, os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
     steps:
       - uses: actions/checkout@v4
