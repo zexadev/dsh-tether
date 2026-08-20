@@ -380,7 +380,7 @@ async fn handle_phone(
     // 之后整条流拼原始字节到 proxy_target(dsh web)。连接断开 accept_bi 报错,循环自然结束。
     let proxy_acceptor = async {
         let permits = Arc::new(tokio::sync::Semaphore::new(64));
-        while let Ok((mut psend, mut precv)) = conn.accept_bi().await {
+        while let Ok((psend, mut precv)) = conn.accept_bi().await {
             let Some(target) = proxy_target else {
                 eprintln!("[host] 未配置 --proxy-target,拒绝代理流");
                 continue;
