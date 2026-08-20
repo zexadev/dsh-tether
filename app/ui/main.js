@@ -2,8 +2,8 @@ const { invoke } = window.__TAURI__.core
 const { listen } = window.__TAURI__.event
 const notification = window.__TAURI__.notification
 
-/** 项目主页;仓库还没建,填上即在主机页底部出现入口 */
-const PROJECT_URL = ''
+/** 项目主页;为空则主机页底部不显示入口 */
+const PROJECT_URL = 'https://github.com/zexadev/dsh-tether'
 
 const el = (id) => document.getElementById(id)
 const views = { hosts: el('view-hosts'), pair: el('view-pair'), status: el('view-status') }
@@ -311,7 +311,12 @@ async function boot() {
     .catch(() => {})
   if (PROJECT_URL !== '') {
     const link = el('about-link')
-    link.href = PROJECT_URL
+    // 不能让 href 生效:WebView 会就地导航过去,把 App 界面顶掉且退不回来。
+    // 交给 opener 插件,由系统浏览器打开。
+    link.addEventListener('click', (e) => {
+      e.preventDefault()
+      invoke('plugin:opener|open_url', { url: PROJECT_URL }).catch(() => {})
+    })
     link.classList.remove('hidden')
   }
   await refreshHosts()

@@ -1,5 +1,12 @@
 {
   "identifier": "default",
   "windows": ["main"],
-  "permissions": ["core:default", "notification:default"]
+  "permissions": [
+    "core:default",
+    "notification:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://github.com/zexadev/dsh-tether" }]
+    }
+  ]
 }

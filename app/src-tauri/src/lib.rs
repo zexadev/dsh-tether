@@ -316,6 +316,7 @@ async fn connect(app: AppHandle, id: Option<String>) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             list_hosts,
