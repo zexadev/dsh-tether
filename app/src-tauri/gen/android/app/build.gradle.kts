@@ -13,6 +13,16 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// 签名配置。Tauri 生成的工程不带这段,而 release 版 APK 不签名就装不上。
+// 密钥由 CI 从 secrets 落成 ../keystore.properties;本地没有该文件时不声明
+// 签名配置,release 构建仍然可以跑(产出未签名包),不至于把本地开发卡死。
+val keystoreProperties = Properties().apply {
+    val propFile = rootProject.file("keystore.properties")
+    if (propFile.exists()) {
+        propFile.inputStream().use { load(it) }
+    }
+}
+
 android {
     compileSdk = 36
     namespace = "cc.zexa.dshtether"
@@ -23,6 +33,14 @@ android {
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        create("release") {
+            keystoreProperties["storeFile"]?.let { storeFile = file(it as String) }
+            storePassword = keystoreProperties["storePassword"] as String?
+            keyAlias = keystoreProperties["keyAlias"] as String?
+            keyPassword = keystoreProperties["password"] as String?
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -37,6 +55,9 @@ android {
             }
         }
         getByName("release") {
+            if (keystoreProperties.containsKey("storeFile")) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
