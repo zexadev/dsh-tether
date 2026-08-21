@@ -19,6 +19,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2EA44F?style=flat" alt="MIT"></a>
   <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7%20%7C%20rc.8-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7 | rc.8">
   <img src="https://img.shields.io/badge/Android-4493F8?style=flat" alt="Android">
+  <img src="https://img.shields.io/badge/iOS-%E6%B5%8B%E8%AF%95%E7%89%88-8E8E93?style=flat" alt="iOS 测试版">
 </p>
 
 <p align="center">
@@ -43,10 +44,13 @@ DSH Tether 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harnes
 | --- | --- | --- |
 | 电脑 | — | `dsh plugin --profile web add dsh-plugin-tether` |
 | 手机 | [Release](../../releases/latest) 里的 `dsh-tether-<版本>-arm64.apk` | 已签名,直接安装 |
+| 手机(iOS) | [Release](../../releases/latest) 里的 `dsh-tether-<版本>-ios-unsigned.ipa` | **测试版**,未签名,需自签 |
 
 插件带一个 Rust 写的 sidecar 负责 iroh 连接,按平台拆成独立子包;安装时只会下载与你系统匹配的那一个,不用手动选。
 
 手机端按 CPU 架构分了四个包,**近十年的安卓手机都选 `arm64`**;`arm` 给 32 位老设备,`x86` / `x86_64` 给模拟器和 ChromeOS。装错了系统会直接拒绝安装,不会装出问题。
+
+iOS 版是**测试版**:本项目没有 Mac,该包只在 CI 上构建过,从未在真机上运行。需要用 AltStore、Sideloadly 一类工具自行签名(免费 Apple ID 签的应用 7 天过期)。遇到问题请提 issue。
 
 也可以从源码构建 sidecar(需要 Rust):
 
@@ -99,7 +103,7 @@ dsh plugin --profile web add .
 
 ## 已知限制
 
-- 只有 Android。iOS 暂不做。
+- iOS 版是测试版:只在 CI 上构建,从未在真机运行过,且需要自行签名。安卓版是经过真机验证的那一个。
 - App 打开时才连接,不在后台常驻——Android 的 doze 也留不住它。
 - 手机上的界面是 DSH 自己的,窄屏适配靠注入的最小样式完成;dsh 改版式时可能需要跟进。
 - 已针对 dsh **`0.1.0-rc.7`** 与 **`0.1.0-rc.8`** 验证。dsh 处于 developer preview,换更新的 dsh 之前先看这一行。

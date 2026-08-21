@@ -19,6 +19,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2EA44F?style=flat" alt="MIT"></a>
   <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7%20%7C%20rc.8-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7 | rc.8">
   <img src="https://img.shields.io/badge/Android-4493F8?style=flat" alt="Android">
+  <img src="https://img.shields.io/badge/iOS-beta-8E8E93?style=flat" alt="iOS beta">
 </p>
 
 <p align="center">
@@ -43,10 +44,13 @@ If you only use your phone on the same Wi-Fi as your machine, you don't need any
 | --- | --- | --- |
 | Machine | — | `dsh plugin --profile web add dsh-plugin-tether` |
 | Phone | `dsh-tether-<version>-arm64.apk` from the [Release](../../releases/latest) | Signed — install it directly |
+| Phone (iOS) | `dsh-tether-<version>-ios-unsigned.ipa` from the [Release](../../releases/latest) | **Beta**, unsigned — sign it yourself |
 
 The plugin carries a small Rust sidecar that owns the iroh connection, shipped as one package per platform; installing pulls only the one matching your system, with nothing to choose.
 
 The phone build is split by CPU architecture. **Any Android phone from the last decade takes `arm64`**; `arm` is for 32-bit legacy devices, and `x86` / `x86_64` are for emulators and ChromeOS. Picking the wrong one simply gets refused at install time.
+
+The iOS build is **beta**: this project has no Mac, so the package is only ever built in CI and has never run on a real device. You sign it yourself with AltStore, Sideloadly or similar (a free Apple ID expires after 7 days). Please open an issue if you hit anything.
 
 You can also build the sidecar from source (needs Rust):
 
@@ -99,7 +103,7 @@ From then on the app connects by itself when you open it.
 
 ## Known limitations
 
-- Android only. iOS is not planned for now.
+- The iOS build is beta: built only in CI, never run on a real device, and you sign it yourself. Android is the one verified on real hardware.
 - The app connects when you open it and holds no background connection — Android's doze would not let it anyway.
 - The interface on the phone is DSH's own; the narrow-screen fit comes from minimal injected styles, so a dsh layout change may need a follow-up here.
 - Verified against dsh **`0.1.0-rc.7`** and **`0.1.0-rc.8`**. dsh is in developer preview — check this line before assuming a newer dsh works.
