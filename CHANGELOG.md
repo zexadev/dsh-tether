@@ -2,6 +2,13 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.4
+
+### 兼容性
+
+- **确认支持 dsh `0.1.0-rc.8`**。已在 rc.8 环境下逐项核对本插件依赖的上游接触面:patch 引用的三个包名仍存在且 patch 实际生效(`--dump-config` 可见 `directory-picker` 已停用、两个 browse 条目已挂上);窄屏样式依赖的布局 class 未变;`sidebar.footer.action` 与 `settings.trigger` 两个插槽仍在;插件的三条 HTTP 路由均正常且跨站请求仍被拒。
+- `peerDependencies` 由精确的 `0.1.0-rc.7` 放宽为 `>=0.1.0-rc.7`。此前的精确版本号会让 rc.8 用户在安装时收到 unmet peer 警告,而两个版本实测都可用。
+
 ## 0.1.3
 
 ### 新增

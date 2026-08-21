@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-tether",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Reach the DeepSeek Harness on your dev machine from your phone — across networks, through no server at all (iroh P2P)",
   "keywords": [
     "dsh",
@@ -38,10 +38,10 @@
     "@deepseek-ai/dsh-user-approval": { "optional": true }
   },
   "optionalDependencies": {
-    "dsh-tether-host-darwin-arm64": "0.1.3",
-    "dsh-tether-host-darwin-x64": "0.1.3",
-    "dsh-tether-host-linux-arm64": "0.1.3",
-    "dsh-tether-host-linux-x64": "0.1.3",
-    "dsh-tether-host-win32-x64": "0.1.3"
+    "dsh-tether-host-darwin-arm64": "0.1.4",
+    "dsh-tether-host-darwin-x64": "0.1.4",
+    "dsh-tether-host-linux-arm64": "0.1.4",
+    "dsh-tether-host-linux-x64": "0.1.4",
+    "dsh-tether-host-win32-x64": "0.1.4"
   }
 }
