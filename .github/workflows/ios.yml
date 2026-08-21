@@ -34,56 +34,28 @@ jobs:
         run: pnpm exec tauri ios init --ci
         working-directory: app
 
-      # 工程名与 scheme 名由 tauri 依 productName 推导,不写死;先列出来再挑,
-      # 顺便让日志留下真实名字,以后对不上时一眼能看见。
-      - name: 找出 Xcode 工程与 scheme
-        id: xc
+      # xcode-script 是被 Xcode 构建阶段回调的,它要读 tauri CLI 父进程写的 IPC
+      # 文件($TMPDIR/<identifier>-server-addr);直接调 xcodebuild 时该文件不存在,
+      # 会 panic。所以这条工程不能脱离 tauri CLI 驱动,必须走 tauri ios build。
+      # 本轮先把它的可用选项打出来,再试一次,失败也继续,好一次拿全信息。
+      - name: tauri ios build 的选项
         run: |
-          proj=$(find app/src-tauri/gen/apple -maxdepth 1 -name '*.xcodeproj' | head -1)
-          echo "工程: $proj"
-          xcodebuild -list -project "$proj"
-          scheme=$(xcodebuild -list -project "$proj" -json | node -e "
-            let s=''
-            process.stdin.on('data', (d) => { s += d }).on('end', () => {
-              const list = JSON.parse(s).project.schemes || []
-              const hit = list.find((x) => x.endsWith('_iOS')) || list[0]
-              if (!hit) { console.error('没有可用 scheme'); process.exit(1) }
-              process.stdout.write(hit)
-            })")
-          echo "scheme: $scheme"
-          echo "proj=$proj" >> "$GITHUB_OUTPUT"
-          echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
+          pnpm exec tauri --version
+          pnpm exec tauri ios build --help
+        working-directory: app
 
-      # CODE_SIGNING_ALLOWED=NO 让 xcodebuild 跳过签名与授权文件嵌入,
-      # 产出的 .app 没有签名——正是自签工具要重签的对象。
-      - name: 构建(不签名)
+      - name: 试构建
+        id: try
+        continue-on-error: true
+        run: pnpm exec tauri ios build --ci 2>&1 | tail -60
+        working-directory: app
+
+      - name: 产出了什么
+        if: always()
         run: |
-          xcodebuild \
-            -project "${{ steps.xc.outputs.proj }}" \
-            -scheme "${{ steps.xc.outputs.scheme }}" \
-            -configuration release \
-            -sdk iphoneos \
-            -derivedDataPath ios-build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS="" \
-            build
-
-      # ipa 就是把 .app 放进 Payload/ 再 zip;没有别的仪式。
-      - name: 打包 ipa
-        run: |
-          app=$(find ios-build/Build/Products -maxdepth 2 -name '*.app' -type d | head -1)
-          test -n "$app" || { echo "没找到构建产物 .app"; exit 1; }
-          echo "产物: $app"
-          version=$(node -p "require('./package.json').version")
-          mkdir -p Payload
-          cp -R "$app" Payload/
-          zip -qry "dsh-tether-$version-ios-unsigned.ipa" Payload
-          ls -la *.ipa
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ipa
-          path: '*.ipa'
-          if-no-files-found: error
+          echo '--- gen/apple 顶层 ---'
+          ls -la app/src-tauri/gen/apple 2>/dev/null || true
+          echo '--- 找 .app / .ipa / .xcarchive ---'
+          find app/src-tauri/gen/apple -maxdepth 6 ( -name '*.app' -o -name '*.ipa' -o -name '*.xcarchive' ) 2>/dev/null | head
+          echo '--- 找 iOS 目标的 rust 产物 ---'
+          find app/src-tauri/target -maxdepth 3 -name '*.a' -path '*ios*' 2>/dev/null | head
