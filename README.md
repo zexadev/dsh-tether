@@ -17,7 +17,7 @@
   <a href="../../releases"><img src="https://img.shields.io/github/downloads/zexadev/dsh-tether/total?style=flat&label=downloads&color=4D6BFE" alt="Downloads"></a>
   <a href="../../stargazers"><img src="https://img.shields.io/github/stars/zexadev/dsh-tether?style=flat&label=%E2%98%85&color=08C" alt="Stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2EA44F?style=flat" alt="MIT"></a>
-  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7">
+  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7%20%7C%20rc.8-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7 | rc.8">
   <img src="https://img.shields.io/badge/Android-4493F8?style=flat" alt="Android">
 </p>
 
@@ -102,7 +102,7 @@ From then on the app connects by itself when you open it.
 - Android only. iOS is not planned for now.
 - The app connects when you open it and holds no background connection — Android's doze would not let it anyway.
 - The interface on the phone is DSH's own; the narrow-screen fit comes from minimal injected styles, so a dsh layout change may need a follow-up here.
-- Verified against dsh **`0.1.0-rc.7`**. dsh is in developer preview — check this line before assuming a newer dsh works.
+- Verified against dsh **`0.1.0-rc.7`** and **`0.1.0-rc.8`**. dsh is in developer preview — check this line before assuming a newer dsh works.
 
 ## What has been verified
 
