@@ -18,5 +18,12 @@
     "security": {
       "csp": null
     }
+  },
+  "bundle": {
+    "iOS": {
+      "frameworks": [
+        "SystemConfiguration"
+      ]
+    }
   }
 }
