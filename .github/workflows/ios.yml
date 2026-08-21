@@ -56,6 +56,8 @@ jobs:
           echo '--- gen/apple 顶层 ---'
           ls -la app/src-tauri/gen/apple 2>/dev/null || true
           echo '--- 找 .app / .ipa / .xcarchive ---'
-          find app/src-tauri/gen/apple -maxdepth 6 ( -name '*.app' -o -name '*.ipa' -o -name '*.xcarchive' ) 2>/dev/null | head
+          for pat in '*.app' '*.ipa' '*.xcarchive'; do
+            find app/src-tauri/gen/apple -maxdepth 6 -name "$pat" 2>/dev/null | head -3
+          done
           echo '--- 找 iOS 目标的 rust 产物 ---'
           find app/src-tauri/target -maxdepth 3 -name '*.a' -path '*ios*' 2>/dev/null | head
