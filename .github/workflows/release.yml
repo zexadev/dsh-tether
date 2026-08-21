@@ -110,9 +110,56 @@ jobs:
           path: app/src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
 
+  # iOS 未签名 ipa,供用户自签安装。continue-on-error:iOS 侧无法在本地验证,
+  # 是试验性目标;它挂掉不该连带阻塞安卓与 npm 的发布,所以只让它影响自己。
+  ipa:
+    name: ios ipa
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+      - run: pnpm install
+        working-directory: app
+      - run: pnpm exec tauri ios init --ci
+        working-directory: app
+      # --no-sign:本项目不持有 Apple 开发者账号,默认路径会以
+      # "requires a development team" 失败。产出的包由用户自行签名。
+      - run: pnpm exec tauri ios build --ci --no-sign --target aarch64
+        working-directory: app
+      - name: 打包 ipa
+        run: |
+          version=$(node -p "require('./package.json').version")
+          out="dsh-tether-$version-ios-unsigned.ipa"
+          ipa=$(find app/src-tauri/gen/apple -name '*.ipa' | head -1)
+          if [ -n "$ipa" ]; then
+            cp "$ipa" "$out"
+          else
+            app=$(find app/src-tauri/gen/apple -name '*.app' -type d | head -1)
+            test -n "$app" || { echo '构建未产出 .app'; exit 1; }
+            mkdir -p Payload
+            cp -R "$app" Payload/
+            zip -qry "$out" Payload
+          fi
+          ls -la "$out"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ipa
+          path: '*.ipa'
+          if-no-files-found: error
+
   release:
     name: 汇总发布
-    needs: [host, apk]
+    needs: [host, apk, ipa]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -126,6 +173,8 @@ jobs:
             (cd "$d" && npm pack --pack-destination "$GITHUB_WORKSPACE/upload")
           done
           find dist -name '*.apk' -exec cp {} upload/ \;
+          # ipa 可能因 iOS 构建失败而缺席,不作存在性断言
+          find dist -name '*.ipa' -exec cp {} upload/ \;
           ls -la upload/
       # Release 说明取自 CHANGELOG.md 对应版本那一节,而不是自动生成的提交列表:
       # 提交信息是写给维护者看的,发布说明是写给用户看的,两者受众不同。
