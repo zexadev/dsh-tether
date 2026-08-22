@@ -21,6 +21,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - run: cargo build --workspace
+      # tether-core 的测试断言私密文件的 POSIX 权限位;那段代码在 Windows 上
+      # 不编译,只有在 Linux runner 上跑过才算验证。
+      - run: cargo test -p tether-core
       - uses: actions/setup-node@v5
         with: { node-version: '22' }
       - name: 插件与前端语法自检

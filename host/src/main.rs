@@ -17,7 +17,10 @@ use clap::{Parser, Subcommand};
 use iroh::endpoint::{presets, Connection};
 use iroh::{Endpoint, EndpointId};
 use rand::Rng;
-use tether_core::{load_or_create_secret, read_line_bounded, write_line, Wire, ALPN, MAX_LINE, MAX_UNPAIRED_LINE};
+use tether_core::{
+    load_or_create_secret, read_line_bounded, write_line, write_private, Wire, ALPN, MAX_LINE,
+    MAX_UNPAIRED_LINE,
+};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::{mpsc, Mutex};
@@ -179,12 +182,9 @@ fn load_store(path: &Path) -> PairedStore {
         .unwrap_or_default()
 }
 
+// 白名单里每条都是一把长期凭证,与身份密钥同等对待:仅属主可读。
 fn save_store(path: &Path, store: &PairedStore) -> Result<()> {
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    std::fs::write(path, serde_json::to_vec_pretty(store)?)?;
-    Ok(())
+    write_private(path, &serde_json::to_vec_pretty(store)?)
 }
 
 fn new_pairing_window() -> PairingWindow {

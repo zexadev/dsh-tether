@@ -1,6 +1,7 @@
 //! 审批遥控线协议与连接基元:host(电脑侧 sidecar)、手机 App、phone-sim 共用。
 //! 协议:一连接一条控制 bi 流,JSON-lines;首行 Hello(已配对)或 Pair(配对)。
 
+use std::io::Write as _;
 use std::path::Path;
 
 use anyhow::{bail, Context as _, Result};
@@ -33,19 +34,69 @@ pub enum Wire {
     Decision { id: String, outcome: String },
 }
 
+/// 把既有文件/目录的权限收到仅属主可读写(目录再加可进入)。
+/// Windows 没有 POSIX 权限位,是空操作。
+#[cfg(unix)]
+fn restrict(path: &Path, mode: u32) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let perms = std::fs::Permissions::from_mode(mode);
+    std::fs::set_permissions(path, perms)
+        .with_context(|| format!("收紧权限失败: {}", path.display()))
+}
+#[cfg(not(unix))]
+fn restrict(_path: &Path, _mode: u32) -> Result<()> {
+    Ok(())
+}
+
+/// 建一个仅属主可进入的目录。
+fn create_private_dir(dir: &Path) -> Result<()> {
+    std::fs::create_dir_all(dir)
+        .with_context(|| format!("创建目录失败: {}", dir.display()))?;
+    restrict(dir, 0o700)
+}
+
+/// 写一个只有属主读得到的文件。
+///
+/// 不能只用 std::fs::write:它按 0o666 & ~umask 建文件,通常落到 0o644,
+/// 同机器上任何用户都读得到。而本项目往磁盘上写的恰好是长期凭证——
+/// 身份私钥、配对白名单——读到即可冒充,不需要能执行代码。
+///
+/// OpenOptions 的 mode() 只在「新建」时生效,对已存在的文件无效,
+/// 所以写完再显式 restrict 一次:老版本留下的宽权限文件也要被收紧。
+pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
+    if let Some(dir) = path.parent() {
+        create_private_dir(dir)?;
+    }
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        opts.mode(0o600);
+    }
+    let mut file = opts
+        .open(path)
+        .with_context(|| format!("写入失败: {}", path.display()))?;
+    file.write_all(bytes)
+        .with_context(|| format!("写入失败: {}", path.display()))?;
+    file.sync_all().ok();
+    drop(file);
+    restrict(path, 0o600)
+}
+
 pub fn load_or_create_secret(path: &Path) -> Result<SecretKey> {
     if let Ok(bytes) = std::fs::read(path) {
         let arr: [u8; 32] = bytes
             .as_slice()
             .try_into()
             .with_context(|| format!("身份密钥文件损坏(长度不是 32 字节): {}", path.display()))?;
+        // 旧版本以 0o644 写下的密钥仍在用户磁盘上;每次加载顺手收紧,
+        // 否则升级了也修不好已经泄露面的那些机器。
+        restrict(path, 0o600)?;
         return Ok(SecretKey::from_bytes(&arr));
     }
     let key = SecretKey::generate();
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    std::fs::write(path, key.to_bytes())
+    write_private(path, &key.to_bytes())
         .with_context(|| format!("保存身份密钥失败: {}", path.display()))?;
     Ok(key)
 }
@@ -75,4 +126,64 @@ pub async fn write_line(send: &mut SendStream, line: &str) -> Result<()> {
     send.write_all(line.as_bytes()).await?;
     send.write_all(b"\n").await?;
     Ok(())
+}
+
+// 权限位只在 unix 上存在;Windows 下这些断言无意义,整块不编译。
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt as _;
+
+    fn mode_of(path: &Path) -> u32 {
+        std::fs::metadata(path).unwrap().permissions().mode() & 0o777
+    }
+
+    /// 每个用例一个独立目录,避免并行跑测试时互相干扰。
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("tether-test-{}-{}", std::process::id(), name));
+        std::fs::remove_dir_all(&dir).ok();
+        dir
+    }
+
+    #[test]
+    fn 新建的私密文件与其目录只有属主可访问() {
+        let dir = scratch("fresh");
+        let path = dir.join("identity.key");
+        write_private(&path, b"secret").unwrap();
+        assert_eq!(mode_of(&path), 0o600, "文件权限应为 0600");
+        assert_eq!(mode_of(&dir), 0o700, "目录权限应为 0700");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn 重写会收紧旧版本留下的宽权限文件() {
+        let dir = scratch("rewrite");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("paired.json");
+        // 模拟旧版本 std::fs::write 的产物
+        std::fs::write(&path, b"old").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert_eq!(mode_of(&path), 0o644, "前置条件:先是宽权限");
+
+        write_private(&path, b"new").unwrap();
+        assert_eq!(mode_of(&path), 0o600, "重写后应被收紧");
+        assert_eq!(std::fs::read(&path).unwrap(), b"new", "内容应已更新");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn 加载既有密钥时会顺手收紧权限() {
+        let dir = scratch("load");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("identity.key");
+        let key = SecretKey::generate();
+        std::fs::write(&path, key.to_bytes()).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        // 升级后的第一次启动:不重新生成密钥,但要把权限修好
+        let loaded = load_or_create_secret(&path).unwrap();
+        assert_eq!(loaded.to_bytes(), key.to_bytes(), "身份不能变");
+        assert_eq!(mode_of(&path), 0o600, "既有密钥应被收紧");
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }

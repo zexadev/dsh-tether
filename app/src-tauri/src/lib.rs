@@ -8,7 +8,9 @@ use std::path::PathBuf;
 use anyhow::{bail, Context as _, Result};
 use iroh::endpoint::presets;
 use iroh::{Endpoint, EndpointId};
-use tether_core::{load_or_create_secret, read_line_bounded, write_line, Wire, ALPN, MAX_LINE};
+use tether_core::{
+    load_or_create_secret, read_line_bounded, write_line, write_private, Wire, ALPN, MAX_LINE,
+};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, Mutex};
@@ -83,13 +85,10 @@ fn load_book(app: &AppHandle) -> HostBook {
     }
 }
 
+// 这份清单记着每台已配对电脑的公钥;手机侧同样按私密文件写。
 fn save_book(app: &AppHandle, book: &HostBook) -> Result<()> {
     let path = host_book_path(app)?;
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    std::fs::write(&path, serde_json::to_vec_pretty(book)?)?;
-    Ok(())
+    write_private(&path, &serde_json::to_vec_pretty(book)?)
 }
 
 fn emit_state(app: &AppHandle, status: &'static str, detail: impl Into<String>) {
