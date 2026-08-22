@@ -2,3 +2,5 @@ target/
 tmp_*
 node_modules/
 packages/
+*.jks
+*.keystore
