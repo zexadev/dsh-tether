@@ -11,6 +11,15 @@
     "iroh"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zexadev/dsh-tether.git"
+  },
+  "homepage": "https://dsh-tether.zexa.cc/",
+  "bugs": {
+    "url": "https://github.com/zexadev/dsh-tether/issues"
+  },
+  "author": "zexadev",
   "type": "module",
   "main": "index.js",
   "exports": {

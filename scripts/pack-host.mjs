@@ -56,6 +56,12 @@ writeFileSync(join(out, 'package.json'), `${JSON.stringify({
   version,
   description: `tether-host sidecar binary for ${spec.os}-${spec.cpu}`,
   license: 'MIT',
+  // 目录站按 repository 回链来核实包与仓库的对应关系;缺了这个字段,
+  // 包在 npm 上就是一个没有出处的二进制,谁也无从判断它从哪来。
+  repository: { type: 'git', url: 'git+https://github.com/zexadev/dsh-tether.git' },
+  homepage: 'https://dsh-tether.zexa.cc/',
+  bugs: { url: 'https://github.com/zexadev/dsh-tether/issues' },
+  author: 'zexadev',
   os: [spec.os],
   cpu: [spec.cpu],
   files: ['bin/'],
