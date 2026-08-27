@@ -20,6 +20,8 @@
   <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7%20%7C%20rc.8-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7 | rc.8">
   <img src="https://img.shields.io/badge/Android-4493F8?style=flat" alt="Android">
   <img src="https://img.shields.io/badge/iOS-%E6%B5%8B%E8%AF%95%E7%89%88-8E8E93?style=flat" alt="iOS 测试版">
+  <a href="https://www.dsh.so/artifact/dsh-tether"><img src="https://www.dsh.so/badge/dsh-tether.svg" alt="dsh.so 安全扫描"></a>
+  <a href="https://www.dsh.so/artifact/dsh-tether"><img src="https://www.dsh.so/badge/install/dsh-tether.svg" alt="dsh.so 安装实测"></a>
 </p>
 
 <p align="center">
