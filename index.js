@@ -159,6 +159,9 @@ function apply(ctx, config = {}) {
       case 'peer-disconnected':
         console.log('[tether] 手机已断开')
         break
+      case 'proxy-opened':
+        console.log('[tether] 手机已开始加载界面')
+        break
       case 'devices': {
         const waiters = pendingDevices
         pendingDevices = []

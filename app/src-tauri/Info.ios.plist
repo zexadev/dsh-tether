@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  iOS 的 App Transport Security 默认禁止 WebView 加载明文 HTTP。而本机代理出口是
+  http://127.0.0.1:<OS 分配端口>(iroh 流的本地一端),WebView 必须能加载它,
+  否则连接建立成功、界面却是空白。
+
+  只开 NSAllowsLocalNetworking:它放行回环、.local 与链路本地地址,其余域仍受 ATS
+  约束。与安卓侧 network_security_config.xml 只放行 127.0.0.1/localhost 的做法一致,
+  不用 NSAllowsArbitraryLoads 把整个 ATS 关掉。
+
+  该文件由 tauri 合并进生成的 iOS 工程 plist;gen/apple 每次构建重新生成,
+  改那里的东西留不住。
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+</dict>
+</plist>

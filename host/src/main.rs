@@ -103,6 +103,8 @@ enum PluginOut {
     PeerPath { peer: String, kind: String, remote: String },
     PeerDisconnected { peer: String },
     Decision { id: String, outcome: String },
+    /// 手机第一次开代理流——即 WebView 真的开始拉界面了
+    ProxyOpened,
     /// 已配对设备全量列表;online 标出此刻连着的那些
     Devices { devices: Vec<DeviceView> },
 }
@@ -430,7 +432,14 @@ async fn handle_phone(
     // 之后整条流拼原始字节到 proxy_target(dsh web)。连接断开 accept_bi 报错,循环自然结束。
     let proxy_acceptor = async {
         let permits = Arc::new(tokio::sync::Semaphore::new(64));
+        // 手机连上却看不到界面时,唯一能区分「WebView 压根没发请求」和「发了但转不通」
+        // 的信号就是这里。只报第一条:一个页面会开很多条流,每条都打就成了刷屏。
+        let mut announced = false;
         while let Ok((psend, mut precv)) = conn.accept_bi().await {
+            if !announced {
+                announced = true;
+                emit(&PluginOut::ProxyOpened);
+            }
             let Some(target) = proxy_target else {
                 eprintln!("[host] 未配置 --proxy-target,拒绝代理流");
                 continue;
