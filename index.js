@@ -175,6 +175,44 @@ function apply(ctx, config = {}) {
 
   ctx.effect(() => ctx.webServer.tapIndex(injectNarrowScreenCss))
 
+  // dsh 0.1.2-alpha 起浏览器界面要求认证:进程启动 token 经 GET /?token= 换成
+  // HMAC 签名 cookie,index 与 /api 无 cookie 一律 401。cookie 是 SameSite=Strict
+  // 且绑定 Host authority——手机 WebView 的 iframe 属跨站上下文,cookie 根本不会
+  // 随请求发出,把 token 交给手机没有用;唯一可行位置在电脑侧:这里自己完成兑换,
+  // 把 cookie 交给 sidecar 在代理流上逐请求注入。
+  ctx.inject(['connection'], (connCtx) => {
+    // rc.7/rc.8 也有 connection 服务,只是没有浏览器认证;判据必须是能力
+    // 本身而不是服务存在性(实测 rc.8 走到这里,靠服务存在性判会误报错)
+    if (typeof connCtx.connection.authenticatedUrl !== 'function') return
+    const authority = new URL(`http://${proxyTarget}`).host
+    const exchange = async () => {
+      const url = connCtx.connection.authenticatedUrl(`http://${proxyTarget}/`)
+      const res = await fetch(url, { redirect: 'manual' })
+      const setCookie = res.headers.getSetCookie()
+      if (res.status !== 303 || setCookie.length !== 1) {
+        throw new Error(`token 兑换应答异常: HTTP ${res.status}, set-cookie ×${setCookie.length}`)
+      }
+      send({ type: 'proxy-auth', cookie: setCookie[0].split(';', 1)[0], authority })
+    }
+    const exchangeWithRetry = async () => {
+      for (let attempt = 1; ; attempt++) {
+        try {
+          return await exchange()
+        } catch (error) {
+          if (attempt >= 3) {
+            console.error('[tether] 浏览器认证 cookie 获取失败,手机端将收到 401:', error)
+            return
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
+        }
+      }
+    }
+    void exchangeWithRetry()
+    // cookie 绝对有效期默认 30 天,dsh 进程可能活得更久;定期重兑换续上
+    const timer = setInterval(() => { void exchangeWithRetry() }, 12 * 60 * 60 * 1000)
+    connCtx.effect(() => () => clearInterval(timer))
+  })
+
   // 「打开配置文件」在宿主机桌面开编辑器,手机上按了毫无反应。这条路由把同一份
   // 文件的内容原样交给手机自己渲染。路径由 Host 侧的 settings.documentPath 决定,
   // 不接受客户端传路径——否则就成了任意文件读取。
