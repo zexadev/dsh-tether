@@ -107,9 +107,21 @@ function apply(ctx, config = {}) {
   if (config.pair) args.push('--pair')
   const child = spawn(binary, args, { stdio: ['pipe', 'pipe', 'inherit'] })
   ctx.effect(() => () => { child.kill() })
+  /** sidecar 不在了的原因;undefined = 活着。等它回话的路由用来立即报错 */
+  let sidecarGone
   child.on('exit', (code) => {
     // sidecar 死了必须可见:手机端会静默失联,而电脑侧一切照常
+    sidecarGone = `sidecar 已退出(code=${code})`
     console.error(`[tether] sidecar 退出 code=${code};手机端已失联`)
+  })
+  // spawn 失败只走 error 不走 exit;不接住就是 uncaught。EACCES 曾实发过:
+  // 打包丢了二进制执行位,现场只有一句干瘪的 Permission denied,毫无指向
+  child.on('error', (error) => {
+    const hint = error.code === 'EACCES'
+      ? ';EACCES 通常是二进制缺可执行位,试 chmod 0755 该文件并升级插件'
+      : ''
+    sidecarGone = `sidecar 启动失败: ${error.message}${hint}`
+    console.error(`[tether] ${sidecarGone}(${binary})`)
   })
 
   const send = (msg) => { child.stdin.write(JSON.stringify(msg) + '\n') }
@@ -250,6 +262,12 @@ function apply(ctx, config = {}) {
     path: PAIRING_PATH,
     handler: async (req, res) => {
       if (!isTrustedRequest(req)) return refuse(res)
+      // sidecar 不在了就别让人干等 5 秒换一个不明所以的 504
+      if (sidecarGone !== undefined) {
+        res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' })
+        res.end(sidecarGone)
+        return
+      }
       const result = await new Promise((resolve) => {
         pendingPairing = resolve
         send({ type: 'pairing-begin' })
@@ -276,6 +294,11 @@ function apply(ctx, config = {}) {
     path: DEVICES_PATH,
     handler: async (req, res) => {
       if (!isTrustedRequest(req)) return refuse(res)
+      if (sidecarGone !== undefined) {
+        res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' })
+        res.end(sidecarGone)
+        return
+      }
       if (req.method === 'POST') {
         const id = await readForgetId(req)
         if (id === undefined) {
