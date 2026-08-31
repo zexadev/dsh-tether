@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Context as _, Result};
 use clap::{Parser, Subcommand};
-use iroh::endpoint::{presets, Connection};
+use iroh::endpoint::{presets, Connection, RecvStream};
 use iroh::{Endpoint, EndpointId};
 use rand::Rng;
 use tether_core::{
@@ -88,6 +88,7 @@ enum PluginIn {
     PairingBegin,
     DeviceList,
     DeviceForget { id: String },
+    ProxyAuth { cookie: String, authority: String },
 }
 
 /// sidecar → 插件(stdout)
@@ -135,6 +136,15 @@ struct PairingWindow {
     attempts: u32,
 }
 
+/// dsh 0.1.2-alpha 起浏览器界面要求认证 cookie。插件在电脑侧完成 token→cookie
+/// 兑换后把材料下发到这里,代理流逐请求注入;没收到材料(旧版 dsh)则原样透传。
+struct ProxyAuth {
+    /// `name=value`,不含属性段
+    cookie: String,
+    /// dsh web 的规范 authority;cookie 签名绑定它,Host/Origin 都要改写成它
+    authority: String,
+}
+
 /// 一台在线手机。连接句柄要留着:移除已配对设备时必须能主动断开它,
 /// 只丢下行队列不行——那只会结束 writer,reader 与代理接收仍挂在连接上。
 struct PeerConn {
@@ -148,6 +158,7 @@ struct HostState {
     pairing: Option<PairingWindow>,
     /// 在线手机(EndpointId 字符串 → 下行写队列 + 连接句柄)
     conns: HashMap<String, PeerConn>,
+    proxy_auth: Option<Arc<ProxyAuth>>,
 }
 
 #[tokio::main]
@@ -211,7 +222,7 @@ async fn host_main(data_dir: PathBuf, force_pair: bool, proxy_target: Option<std
         .context("iroh endpoint 启动失败")?;
     emit(&PluginOut::Ready { endpoint_id: ep.id().to_string() });
 
-    let mut state = HostState { store_path, store, pairing: None, conns: HashMap::new() };
+    let mut state = HostState { store_path, store, pairing: None, conns: HashMap::new(), proxy_auth: None };
     if force_pair || state.store.devices.is_empty() {
         let w = new_pairing_window();
         emit(&PluginOut::Pairing { code: w.code.clone(), expires_in_sec: PAIRING_TTL.as_secs() });
@@ -282,6 +293,16 @@ async fn stdin_loop(state: Arc<Mutex<HostState>>) {
                     peer.conn.close(1u8.into(), b"forgotten");
                 }
                 emit(&PluginOut::Devices { devices: device_views(&s) });
+            }
+            PluginIn::ProxyAuth { cookie, authority } => {
+                // 这两个值会被拼进转发的请求头;插件是可信父进程,但这是进程
+                // 边界,控制字符(CRLF 注入)在这里挡一道
+                if cookie.bytes().chain(authority.bytes()).any(|b| b < 0x20 || b == 0x7f) {
+                    eprintln!("[host] proxy-auth 含控制字符,已丢弃");
+                    continue;
+                }
+                state.lock().await.proxy_auth = Some(Arc::new(ProxyAuth { cookie, authority }));
+                eprintln!("[host] 已装载浏览器认证 cookie,代理流将逐请求注入");
             }
         }
     }
@@ -430,6 +451,7 @@ async fn handle_phone(
     };
     // 控制流建立(已配对)后,同一连接的后续 bi 流是代理流:首行 {"type":"proxy"},
     // 之后整条流拼原始字节到 proxy_target(dsh web)。连接断开 accept_bi 报错,循环自然结束。
+    let proxy_state = state.clone();
     let proxy_acceptor = async {
         let permits = Arc::new(tokio::sync::Semaphore::new(64));
         // 手机连上却看不到界面时,唯一能区分「WebView 压根没发请求」和「发了但转不通」
@@ -445,16 +467,36 @@ async fn handle_phone(
                 continue;
             };
             let permit = permits.clone().acquire_owned().await.expect("semaphore 不会关闭");
+            let auth_state = proxy_state.clone();
             tokio::spawn(async move {
                 let _permit = permit;
                 match read_line_bounded(&mut precv, 256).await.map(|l| serde_json::from_str::<Wire>(&l)) {
                     Ok(Ok(Wire::Proxy)) => {}
                     _ => return,
                 }
+                let auth = auth_state.lock().await.proxy_auth.clone();
+                // 有认证材料时先把请求头读完改写;头之后的字节(请求体/升级后
+                // 的 WebSocket 帧)仍走裸转发
+                let head = match &auth {
+                    None => None,
+                    Some(auth) => match read_request_head(&mut precv).await {
+                        Ok(head) => Some(rewrite_request_head(&head, auth)),
+                        Err(e) => {
+                            eprintln!("[host] 代理流请求头读取失败: {e:#}");
+                            return;
+                        }
+                    },
+                };
                 let Ok(mut tcp) = tokio::net::TcpStream::connect(target).await else {
                     eprintln!("[host] 代理流无法连接 {target}(dsh web 未启动?)");
                     return;
                 };
+                if let Some(head) = head {
+                    use tokio::io::AsyncWriteExt as _;
+                    if tcp.write_all(head.as_bytes()).await.is_err() {
+                        return;
+                    }
+                }
                 let mut stream = tokio::io::join(precv, psend);
                 let _ = tokio::io::copy_bidirectional(&mut tcp, &mut stream).await;
             });
@@ -468,6 +510,109 @@ async fn handle_phone(
     }
     emit(&PluginOut::PeerDisconnected { peer: remote });
     Ok(())
+}
+
+/// 逐字节读完一个 HTTP/1.1 请求头(含结尾空行)。逐字节与 read_line_bounded
+/// 同理:不越读,头之后的字节(请求体)原样留在流里交给后面的裸转发。
+async fn read_request_head(recv: &mut RecvStream) -> Result<String> {
+    const MAX_HEAD: usize = 64 * 1024;
+    let mut head = Vec::with_capacity(1024);
+    let mut byte = [0u8; 1];
+    while !head.ends_with(b"\r\n\r\n") {
+        let Some(n) = recv.read(&mut byte).await? else {
+            bail!("对端在请求头结束前关闭了流");
+        };
+        if n == 0 {
+            continue;
+        }
+        head.push(byte[0]);
+        if head.len() > MAX_HEAD {
+            bail!("请求头超限({MAX_HEAD} 字节)");
+        }
+    }
+    String::from_utf8(head).context("请求头不是 UTF-8")
+}
+
+/// 改写一个请求头:Host/Origin 指到 dsh 真实 authority、注入认证 cookie、
+/// 非升级请求强制 Connection: close。
+///
+/// close 是「逐请求注入」的实现前提:keep-alive 连接上后续请求同样要注入,
+/// 那要求按 Content-Length/chunked 给请求体分帧;强制一连接一请求后,浏览器
+/// 每个请求都另开连接,每条都从头经过这里,分帧逻辑整个省掉。WebSocket 升级
+/// 例外:保留原 Connection/Upgrade 头,升级后整条流裸转发。
+///
+/// Origin 只在本来就是回环时才改写——它与 Host 的差异纯粹是代理搬家造成的;
+/// 非回环的 Origin(手机浏览器里的恶意页面打手机本地端口)原样放行,让 dsh
+/// 自己的跨站栅栏照旧拒绝。
+fn rewrite_request_head(head: &str, auth: &ProxyAuth) -> String {
+    let head = head.strip_suffix("\r\n\r\n").unwrap_or(head);
+    let mut lines = head.split("\r\n");
+    let request_line = lines.next().unwrap_or_default();
+    let headers: Vec<&str> = lines.collect();
+    let upgrade = headers.iter().any(|l| header_value(l, "upgrade").is_some());
+    let mut out = String::with_capacity(head.len() + 128);
+    out.push_str(request_line);
+    out.push_str("\r\n");
+    for line in &headers {
+        if header_value(line, "host").is_some() {
+            out.push_str("host: ");
+            out.push_str(&auth.authority);
+        } else if let Some(origin) = header_value(line, "origin") {
+            out.push_str("origin: ");
+            match rewrite_origin(origin, &auth.authority) {
+                Some(rewritten) => out.push_str(&rewritten),
+                None => out.push_str(origin),
+            }
+        } else if !upgrade
+            && (header_value(line, "connection").is_some()
+                || header_value(line, "proxy-connection").is_some())
+        {
+            continue;
+        } else {
+            out.push_str(line);
+        }
+        out.push_str("\r\n");
+    }
+    out.push_str("cookie: ");
+    out.push_str(&auth.cookie);
+    out.push_str("\r\n");
+    if !upgrade {
+        out.push_str("connection: close\r\n");
+    }
+    out.push_str("\r\n");
+    out
+}
+
+/// line 形如 `Name: value`;名字命中(大小写不敏感)返回去掉首尾空白的值
+fn header_value<'a>(line: &'a str, name: &str) -> Option<&'a str> {
+    let (key, value) = line.split_once(':')?;
+    key.trim().eq_ignore_ascii_case(name).then(|| value.trim())
+}
+
+/// `http://<回环>[:port]` → `http://<authority>`;其余不动
+fn rewrite_origin(origin: &str, authority: &str) -> Option<String> {
+    let rest = origin.strip_prefix("http://")?;
+    let host = rest.split('/').next().unwrap_or(rest);
+    let hostname = match host.strip_prefix('[') {
+        Some(v6) => v6.split(']').next().unwrap_or(""),
+        None => host.split(':').next().unwrap_or(host),
+    };
+    is_loopback(hostname).then(|| format!("http://{authority}"))
+}
+
+/// 回环判据与 dsh 一致:localhost、IPv6 回环、整个 127/8
+fn is_loopback(hostname: &str) -> bool {
+    if hostname == "localhost" || hostname == "::1" {
+        return true;
+    }
+    let parts: Vec<&str> = hostname.split('.').collect();
+    parts.len() == 4
+        && parts[0] == "127"
+        && parts.iter().all(|p| {
+            (1..=3).contains(&p.len())
+                && p.bytes().all(|b| b.is_ascii_digit())
+                && p.parse::<u32>().is_ok_and(|n| n <= 255)
+        })
 }
 
 /// ISO-8601 UTC 当前时间(避免引 chrono,秒级精度够用)
@@ -553,4 +698,79 @@ async fn phone_sim_main(
     }
     ep.close().await;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn auth() -> ProxyAuth {
+        ProxyAuth { cookie: "dsh-auth-abc=v1.xyz".into(), authority: "127.0.0.1:18000".into() }
+    }
+
+    #[test]
+    fn 普通请求改写host_注入cookie_强制close() {
+        let head = "GET /api/x HTTP/1.1\r\nHost: 127.0.0.1:39411\r\nConnection: keep-alive\r\nAccept: */*\r\n\r\n";
+        let out = rewrite_request_head(head, &auth());
+        assert!(out.starts_with("GET /api/x HTTP/1.1\r\n"));
+        assert!(out.contains("host: 127.0.0.1:18000\r\n"), "{out}");
+        assert!(out.contains("cookie: dsh-auth-abc=v1.xyz\r\n"), "{out}");
+        assert!(out.contains("connection: close\r\n"), "{out}");
+        assert!(!out.contains("keep-alive"), "原 Connection 应被移除: {out}");
+        assert!(out.contains("Accept: */*\r\n"), "无关头原样保留: {out}");
+        assert!(out.ends_with("\r\n\r\n"));
+        assert!(!out.contains("Host: 127.0.0.1:39411"), "{out}");
+    }
+
+    #[test]
+    fn 升级请求保留connection与upgrade头_不加close() {
+        let head = "GET /stream HTTP/1.1\r\nHost: 127.0.0.1:39411\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nOrigin: http://127.0.0.1:39411\r\n\r\n";
+        let out = rewrite_request_head(head, &auth());
+        assert!(out.contains("Connection: Upgrade\r\n"), "{out}");
+        assert!(out.contains("Upgrade: websocket\r\n"), "{out}");
+        assert!(!out.contains("connection: close"), "{out}");
+        assert!(out.contains("cookie: dsh-auth-abc=v1.xyz\r\n"), "{out}");
+        assert!(out.contains("origin: http://127.0.0.1:18000\r\n"), "{out}");
+    }
+
+    #[test]
+    fn 回环origin改写_非回环origin原样留给dsh栅栏拒绝() {
+        assert_eq!(
+            rewrite_origin("http://127.0.0.1:39411", "127.0.0.1:18000").as_deref(),
+            Some("http://127.0.0.1:18000")
+        );
+        assert_eq!(
+            rewrite_origin("http://localhost:8080", "127.0.0.1:18000").as_deref(),
+            Some("http://127.0.0.1:18000")
+        );
+        assert_eq!(
+            rewrite_origin("http://[::1]:8080", "127.0.0.1:18000").as_deref(),
+            Some("http://127.0.0.1:18000")
+        );
+        assert_eq!(rewrite_origin("http://evil.example", "127.0.0.1:18000"), None);
+        assert_eq!(rewrite_origin("https://127.0.0.1:39411", "127.0.0.1:18000"), None);
+        assert_eq!(rewrite_origin("null", "127.0.0.1:18000"), None);
+    }
+
+    #[test]
+    fn 回环判定的边界值() {
+        assert!(is_loopback("127.0.0.1"));
+        assert!(is_loopback("127.255.255.255"));
+        assert!(is_loopback("localhost"));
+        assert!(is_loopback("::1"));
+        // 128/8 不是回环;256 越界;127.1 缩写不按四段判
+        assert!(!is_loopback("128.0.0.1"));
+        assert!(!is_loopback("127.0.0.256"));
+        assert!(!is_loopback("127.1"));
+        assert!(!is_loopback("evil.com"));
+        assert!(!is_loopback(""));
+    }
+
+    #[test]
+    fn 手机自带cookie头原样保留_注入的另起一行() {
+        let head = "GET / HTTP/1.1\r\nHost: 127.0.0.1:39411\r\nCookie: stale=1\r\n\r\n";
+        let out = rewrite_request_head(head, &auth());
+        assert!(out.contains("Cookie: stale=1\r\n"), "{out}");
+        assert!(out.contains("cookie: dsh-auth-abc=v1.xyz\r\n"), "{out}");
+    }
 }
