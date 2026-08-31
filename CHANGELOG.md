@@ -2,6 +2,16 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.10
+
+### 修复
+
+- **macOS / Linux:sidecar 起不来,配对时报「sidecar 没有在 5 秒内给出配对码」,终端见 Permission denied**。npm 平台子包里的 `tether-host` 二进制自首个版本起就缺可执行位——CI 的 artifact 传输不保留 Unix 权限位,打包时原样带进了 tgz。Windows 不看执行位,故只在 Mac/Linux 上暴露。由 Mac 用户反馈发现。
+
+  现打包前补回执行位,并对每个发布产物断言执行位存在,缺位则发布直接失败。**Mac/Linux 用户升级本版即修复**:`dsh plugin --profile web add dsh-plugin-tether@0.1.10`。如暂不升级,也可手动 `chmod 0755` 装好的 `dsh-tether-host-*/bin/tether-host` 应急。
+
+- sidecar 启动失败不再只留一句干瘪的错误:插件现在会接住并打印可读原因(EACCES 附排查提示),「连接手机」弹窗里也会立即显示原因,而不是干等 5 秒换一个 504。
+
 ## 0.1.9
 
 ### 新增
