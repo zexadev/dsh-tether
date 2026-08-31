@@ -169,8 +169,17 @@ jobs:
       - name: 打包平台子包
         run: |
           mkdir -p upload
+          # upload/download-artifact 不保留 Unix 权限位:二进制在构建机上有执行位,
+          # 经 artifact 一来一回变 0644,打进 tgz 后 Mac/Linux 装上即 spawn EACCES。
+          # 打包前统一补回,并在 tgz 产物上断言——缺执行位就让发布红掉,
+          # 而不是发出一个在 Mac/Linux 上起不来的包。
+          chmod 0755 dist/host-*/bin/*
           for d in dist/host-*/; do
             (cd "$d" && npm pack --pack-destination "$GITHUB_WORKSPACE/upload")
+          done
+          for t in upload/dsh-tether-host-*.tgz; do
+            tar -tvf "$t" | grep -E '^-rwxr-xr-x.*package/bin/tether-host' \
+              || { echo "::error::$t 内二进制缺执行位"; exit 1; }
           done
           find dist -name '*.apk' -exec cp {} upload/ \;
           # ipa 可能因 iOS 构建失败而缺席,不作存在性断言
