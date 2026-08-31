@@ -17,7 +17,7 @@
   <a href="../../releases"><img src="https://img.shields.io/github/downloads/zexadev/dsh-tether/total?style=flat&label=downloads&color=4D6BFE" alt="Downloads"></a>
   <a href="../../stargazers"><img src="https://img.shields.io/github/stars/zexadev/dsh-tether?style=flat&label=%E2%98%85&color=08C" alt="Stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2EA44F?style=flat" alt="MIT"></a>
-  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7%20%7C%20rc.8-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7 | rc.8">
+  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7%20%7C%20rc.8%20%7C%200.1.2--alpha-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7 | rc.8 | 0.1.2-alpha">
   <img src="https://img.shields.io/badge/Android-4493F8?style=flat" alt="Android">
   <img src="https://img.shields.io/badge/iOS-beta-8E8E93?style=flat" alt="iOS beta">
   <a href="https://www.dsh.so/artifact/dsh-tether"><img src="https://www.dsh.so/badge/dsh-tether.svg" alt="dsh.so security scan"></a>
@@ -108,7 +108,7 @@ From then on the app connects by itself when you open it.
 - The iOS build is beta: built only in CI, never run on a real device, and you sign it yourself. Android is the one verified on real hardware.
 - The app connects when you open it and holds no background connection — Android's doze would not let it anyway.
 - The interface on the phone is DSH's own; the narrow-screen fit comes from minimal injected styles, so a dsh layout change may need a follow-up here.
-- Verified against dsh **`0.1.0-rc.7`** and **`0.1.0-rc.8`**. dsh is in developer preview — check this line before assuming a newer dsh works.
+- Verified against dsh **`0.1.0-rc.7`**, **`0.1.0-rc.8`** and **`0.1.2-alpha`**. dsh is in developer preview — check this line before assuming a newer dsh works. The browser authentication dsh introduced in 0.1.2-alpha is handled entirely on the machine side; the phone app needs no update for it.
 
 ## What has been verified
 

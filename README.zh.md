@@ -17,7 +17,7 @@
   <a href="../../releases"><img src="https://img.shields.io/github/downloads/zexadev/dsh-tether/total?style=flat&label=downloads&color=4D6BFE" alt="下载量"></a>
   <a href="../../stargazers"><img src="https://img.shields.io/github/stars/zexadev/dsh-tether?style=flat&label=%E2%98%85&color=08C" alt="Stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2EA44F?style=flat" alt="MIT"></a>
-  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7%20%7C%20rc.8-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7 | rc.8">
+  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7%20%7C%20rc.8%20%7C%200.1.2--alpha-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7 | rc.8 | 0.1.2-alpha">
   <img src="https://img.shields.io/badge/Android-4493F8?style=flat" alt="Android">
   <img src="https://img.shields.io/badge/iOS-%E6%B5%8B%E8%AF%95%E7%89%88-8E8E93?style=flat" alt="iOS 测试版">
   <a href="https://www.dsh.so/artifact/dsh-tether"><img src="https://www.dsh.so/badge/dsh-tether.svg" alt="dsh.so 安全扫描"></a>
@@ -108,7 +108,7 @@ dsh plugin --profile web add .
 - iOS 版是测试版:只在 CI 上构建,从未在真机运行过,且需要自行签名。安卓版是经过真机验证的那一个。
 - App 打开时才连接,不在后台常驻——Android 的 doze 也留不住它。
 - 手机上的界面是 DSH 自己的,窄屏适配靠注入的最小样式完成;dsh 改版式时可能需要跟进。
-- 已针对 dsh **`0.1.0-rc.7`** 与 **`0.1.0-rc.8`** 验证。dsh 处于 developer preview,换更新的 dsh 之前先看这一行。
+- 已针对 dsh **`0.1.0-rc.7`**、**`0.1.0-rc.8`** 与 **`0.1.2-alpha`** 验证。dsh 处于 developer preview,换更新的 dsh 之前先看这一行。dsh 0.1.2-alpha 引入的浏览器认证完全在电脑侧处理,手机 App 无需更新。
 
 ## 验证过什么
 
