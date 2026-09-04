@@ -25,6 +25,9 @@ const TARGETS = {
   'aarch64-apple-darwin': { os: 'darwin', cpu: 'arm64', exe: 'tether-host' },
   'x86_64-unknown-linux-gnu': { os: 'linux', cpu: 'x64', exe: 'tether-host' },
   'aarch64-unknown-linux-gnu': { os: 'linux', cpu: 'arm64', exe: 'tether-host' },
+  // Termux 的 Node 把 process.platform 报成 'android'(不是 'linux'),npm 的
+  // os/cpu 字段就按这个值筛;二进制本身仍是普通 ELF,只是链的是 bionic 不是 glibc。
+  'aarch64-linux-android': { os: 'android', cpu: 'arm64', exe: 'tether-host' },
 }
 
 const argTarget = process.argv.indexOf('--target')
