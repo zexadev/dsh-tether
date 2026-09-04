@@ -4,6 +4,10 @@
 
 ## 0.1.11
 
+### 新增
+
+- **`tether-host` 新增 android-arm64 平台子包,支持在 Termux 里跑**([#5](https://github.com/zexadev/dsh-tether/issues/5))。sidecar 本身是与 tauri 无关的纯 CLI,交叉编译到 `aarch64-linux-android`(NDK,API 24)与其余四个平台走的是同一套打包流程。Termux 的 Node 把 `process.platform` 报成 `android`(不是 `linux`),`index.js` 现有的自动选包逻辑按这个字段筛,所以是新增一个平台子包而不是复用 linux-arm64。
+
 ### 修复
 
 - **iOS:配对必然 `timed out`,主机侧完全收不到配对请求**([#6](https://github.com/zexadev/dsh-tether/issues/6))。iOS 14 起,发往同网段私网 IP 的收发受内核层 Local Network Privacy 管控,且不区分是否经 NWFramework——iroh/quinn 用的原始 UDP socket 同样受限。此前 `Info.ios.plist` 只有 `NSAllowsLocalNetworking`(管 WebView 加载本机代理页面的 ATS 例外),没有 `NSLocalNetworkUsageDescription`,系统既不弹权限询问也不放行局域网收发。
