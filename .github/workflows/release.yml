@@ -28,6 +28,11 @@ jobs:
           # 主包的 optionalDependencies 列了 linux-arm64,矩阵里就必须有它:
           # 缺的平台子包在安装时被静默跳过,用户要到运行时才发现二进制不存在
           - { name: linux-arm64, os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu }
+          # Termux 场景(#5):tether-host 不依赖 tauri,是与桌面三端同一套的纯
+          # CLI,交叉编译到 Android 走 NDK 的 clang 就行,不需要 apk job 那套
+          # gradle/签名流程。x86_64 host 交叉编译到 aarch64 android,不需要
+          # arm runner。
+          - { name: android-arm64, os: ubuntu-latest, target: aarch64-linux-android }
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
@@ -36,6 +41,22 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
+      # NDK 版本与 apk job 保持一致;sdkmanager 是 JVM 工具,得先有 JDK。
+      - if: matrix.target == 'aarch64-linux-android'
+        uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '21' }
+      - if: matrix.target == 'aarch64-linux-android'
+        uses: android-actions/setup-android@v3
+      - if: matrix.target == 'aarch64-linux-android'
+        name: 装 NDK 并指给 cargo 当交叉编译链接器
+        run: |
+          sdkmanager --install "ndk;27.0.12077973"
+          ndk="$ANDROID_HOME/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          # minSdk 24,与 app/src-tauri/gen/android(tauri 默认值)保持一致
+          echo "CC_aarch64_linux_android=$ndk/aarch64-linux-android24-clang" >> "$GITHUB_ENV"
+          echo "CXX_aarch64_linux_android=$ndk/aarch64-linux-android24-clang++" >> "$GITHUB_ENV"
+          echo "AR_aarch64_linux_android=$ndk/llvm-ar" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$ndk/aarch64-linux-android24-clang" >> "$GITHUB_ENV"
       - run: cargo build --release -p tether-host --target ${{ matrix.target }}
       - run: node scripts/pack-host.mjs --target ${{ matrix.target }}
       # 平台子包整个上传:里面既有二进制,也有 npm publish 需要的 manifest
