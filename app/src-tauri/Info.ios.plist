@@ -8,6 +8,13 @@
   约束。与安卓侧 network_security_config.xml 只放行 127.0.0.1/localhost 的做法一致,
   不用 NSAllowsArbitraryLoads 把整个 ATS 关掉。
 
+  NSLocalNetworkUsageDescription:iOS 14 起,本地网段(同 Wi-Fi 下对方的私网 IP)
+  的收发在内核层受 Local Network Privacy 管控,不区分是否走 NWFramework——iroh/quinn
+  用的原始 UDP socket 同样受限。缺这个键,系统既不弹权限询问也不放行,直连(安卓侧
+  日志里的 direct 路径)在 iOS 上无法建立;报告里"connect timed out"且主机侧完全
+  收不到配对请求,符合本地网段收发被静默丢弃、且连接建立逻辑没能仅凭 relay 路径
+  在超时窗口内完成握手的表现。补上这个键,系统才会弹一次性授权询问。
+
   该文件由 tauri 合并进生成的 iOS 工程 plist;gen/apple 每次构建重新生成,
   改那里的东西留不住。
 -->
@@ -19,5 +26,7 @@
         <key>NSAllowsLocalNetworking</key>
         <true/>
     </dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>用于发现并直连同一局域网内已配对的电脑,不走公网中转时更快、更省流量。</string>
 </dict>
 </plist>
