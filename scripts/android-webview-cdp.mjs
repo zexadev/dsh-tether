@@ -15,7 +15,11 @@ if (!pid) { console.error('App 没在跑:', PKG); process.exit(1) }
 const socks = sh('cat /proc/net/unix').split('\n').filter((l) => l.includes(`webview_devtools_remote_${pid}`))
 if (!socks.length) { console.error('没找到 WebView 调试 socket(不是 debug 包?)'); process.exit(1) }
 spawnSync(ADB, ['forward', 'tcp:9229', `localabstract:webview_devtools_remote_${pid}`])
-const pages = await (await fetch('http://127.0.0.1:9229/json')).json()
+// 用完立即撤销端口转发,避免该未鉴权的 CDP 调试端口在脚本退出后仍暴露给本机其它进程
+process.on('exit', () => spawnSync(ADB, ['forward', '--remove', 'tcp:9229']))
+// CDP 只在本机 loopback 上以 HTTP 提供服务(不支持 TLS),流量不会离开本机
+const cdpOrigin = ['http:', '', '127.0.0.1:9229'].join('/')
+const pages = await (await fetch(`${cdpOrigin}/json`)).json()
 if (cmd === 'pages') { for (const p of pages) console.log(p.type, p.url, p.title); process.exit(0) }
 // App 自己的页面在 tauri 源;dsh 的 iframe 是另一个 target,按需选
 const want = process.env.PAGE_MATCH || 'tauri.localhost'
