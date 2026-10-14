@@ -113,7 +113,7 @@ function refuse(res) {
 
 /** 与 sidecar 无关的部分:窄屏适配注入,以及手机上看配置文件的路由 */
 function applyUi(ctx) {
-  ctx.effect(() => ctx.webServer.tapIndex(injectNarrowScreenCss))
+  mountTetherUi(ctx)
 
   // 「打开配置文件」在宿主机桌面开编辑器,手机上按了毫无反应。这条路由把同一份
   // 文件的内容原样交给手机自己渲染。路径由 Host 侧的 settings.documentPath 决定,
@@ -399,12 +399,52 @@ function apply(ctx, config = {}) {
 }
 
 /**
+ * 挂载「连接手机」按钮与窄屏适配。
+ *
+ * 注入有两条通道,选哪条取决于宿主 webserver 的能力:
+ *
+ * - 结构化 `webserver/index-inject` 行(dsh 0.2.x):行是纯 JSON 数据,同一张表
+ *   有两个渲染器 —— 浏览器拿到的 index.html 直接渲染进文本;**dsh-desktop
+ *   桌面端**的 index.html 来自应用自带的前端产物,不经过宿主 renderIndex,
+ *   只会把这张表经 boot 通道(`ready.injections`)交给渲染器逐行应用
+ *   (global/script/script-src/style/html)。「连接手机」按钮要走这条,
+ *   桌面端侧栏才会出现。
+ * - `tapIndex` 字符串变换(老宿主):只作用于宿主渲染的 index.html,
+ *   桌面端永远看不到。能力判据用 `collectIndexInjections` 存在性,
+ *   与 webserver 自己的版本无关 —— 读不到就是老宿主,退回 tapIndex。
+ *
+ * 两条路只走一条:同一份 CSS/JS 注入两遍没有意义(按钮虽有防重挂载,
+ * 样式与监听器重复纯属浪费)。监听器随插件 fiber 自动销毁(cordis 事件
+ * 默认与注册 fiber 同生命周期),不需要再包一层 effect。
+ */
+function mountTetherUi(ctx) {
+  if (typeof ctx.webServer.collectIndexInjections === 'function') {
+    ctx.on('webserver/index-inject', (table) => {
+      table.push({ kind: 'style', text: tetherCss })
+      table.push({ kind: 'script', text: tetherScript, placement: 'head' })
+    })
+    return
+  }
+  ctx.effect(() => ctx.webServer.tapIndex(injectNarrowScreenCss))
+}
+
+/**
+ * 老宿主回退路径:把同一份样式与脚本以字符串变换塞进 index.html。
+ * 新宿主上这张表由 mountTetherUi 直接推给 webserver/index-inject。
+ */
+function injectNarrowScreenCss(html) {
+  return html.replace(
+    '</head>',
+    `<style data-dsh-tether="narrow-screen">${tetherCss}\n</style><script data-dsh-tether="narrow-screen">${tetherScript}\n</script></head>`,
+  )
+}
+
+/**
  * 窄屏修正:只在 ≤640px 生效,桌面浏览器拿到同一份 index.html 也不受影响。
  * 只用语义选择器(role/aria),不碰 dsh 的 CSS Module 类名——那些名字带内容
  * 哈希,dsh 一改样式就会变,针对它们写规则必碎。
  */
-function injectNarrowScreenCss(html) {
-  const css = `
+const tetherCss = `
 /* 侧栏底部的 sidebar.footer.action 是横排 flex 行,官方设想里放并排的小动作。
    「连接手机」照抄「设置」的类,是占满一行的触发行;别的插件(dsh-cost-meter)
    又往同一行放 width:100% 的面板,横排下两者互挤:本按钮被压到只剩图标,
@@ -530,9 +570,9 @@ function injectNarrowScreenCss(html) {
     z-index: 2;
   }
 }`
-  // 抽屉遮罩只是画上去的,点它不会收起——那需要脚本。这段只做这一件事:
-  // 窄屏下点到抽屉外面就替用户按一次侧栏开关。
-  const script = `
+// 抽屉遮罩只是画上去的,点它不会收起——那需要脚本。这段只做这一件事:
+// 窄屏下点到抽屉外面就替用户按一次侧栏开关。
+const tetherScript = `
 (function () {
   var narrow = window.matchMedia('(max-width: 640px)')
   // 这一部分长在 dsh 界面里,语言就该跟 dsh 的设置走;它把当前语言写在 <html lang> 上
@@ -727,32 +767,52 @@ function injectNarrowScreenCss(html) {
     if (!slot || slot.querySelector('[data-dsh-tether="hosts-trigger"]')) return
     var settings = document.querySelector('[data-slot="settings.trigger"]')
     var reference = settings && settings.closest ? settings.closest('button') : null
-    if (!reference || !reference.parentElement) return
-    // 「设置」是 triggerRow(定高的横排容器)套 trigger(flex:1 1 0%)两层。只抄
-    // 里层放进纵向堆叠的插槽,basis 0% 会变成高度,按钮塌成一行字;两层都抄,
-    // 几何才在宽态 / rail 态都与「设置」一致。
+    // 抄得到「设置」的样式就一字不动地照抄(浏览器侧的外观与改动前逐字相同);
+    // 抄不到(桌面端)才用下面那套自带样式。图标两版不同,所以先定走哪条路。
+    var copyReference = !!(reference && reference.parentElement)
     var row = document.createElement('div')
     row.setAttribute('data-dsh-tether', 'hosts-row')
-    row.className = reference.parentElement.className
     var button = document.createElement('button')
     button.type = 'button'
     button.setAttribute('data-dsh-tether', 'hosts-trigger')
     var label = framed ? tx('我的电脑', 'My computers') : tx('连接手机', 'Connect a phone')
     button.setAttribute('aria-label', label)
-    // 类名带内容哈希,照抄隔壁「设置」按钮当前的,外观自然一致
-    button.className = reference.className
-    button.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg><span data-dsh-tether="hosts-label">' + label + '</span>'
+    // 浏览器侧沿用改动前那个 18px 图标,一字不改;桌面端按 dsh 自己的图标规格画:
+    // 16×16 视图框、size 16、1.3px 描边(它那套 Icon*Medium),字形落在 1.5~14.5 的
+    // 方框里,外面套一层 24px 槽位(见 ensureFallbackStyle),与账号行 24px 的头像同宽同轴。
+    var icon = copyReference
+      ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>'
+      : '<span data-dsh-tether="hosts-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="5.15" y="2.15" width="5.7" height="11.7" rx="1.6"/><path d="M7.1 11.6h1.8" stroke-linecap="round"/></svg></span>'
+    button.innerHTML = icon + '<span data-dsh-tether="hosts-label">' + label + '</span>'
     button.addEventListener('click', function () {
       if (framed) window.parent.postMessage({ type: 'dsh-tether:open-hosts' }, '*')
       else showPairing()
     })
     row.append(button)
     slot.append(row)
-    // 侧栏展开/收起时「设置」两层都会换类名(rail 与否),跟着同步
-    new MutationObserver(function () {
-      button.className = reference.className
+    if (copyReference) {
+      // 「设置」是 triggerRow(定高的横排容器)套 trigger(flex:1 1 0%)两层。只抄
+      // 里层放进纵向堆叠的插槽,basis 0% 会变成高度,按钮塌成一行字;两层都抄,
+      // 几何才在宽态 / rail 态都与「设置」一致。类名带内容哈希,照抄隔壁当前的,
+      // 外观自然跟随 dsh 自己的构建。这一段与改动前逐字相同 —— 浏览器侧的外观
+      // 因此分毫未动,这次改的只有「抄不到样式」那条桌面端兜底路径。
       row.className = reference.parentElement.className
-    }).observe(reference.parentElement, { attributes: true, attributeFilter: ['class'], subtree: true })
+      button.className = reference.className
+      // 侧栏展开/收起时「设置」两层都会换类名(rail 与否),跟着同步
+      new MutationObserver(function () {
+        button.className = reference.className
+        row.className = reference.parentElement.className
+      }).observe(reference.parentElement, { attributes: true, attributeFilter: ['class'], subtree: true })
+    } else {
+      // dsh-desktop 桌面端:设置入口由原生壳提供(⌘,),侧栏里**没有**
+      // settings.trigger 可抄(实测心跳回报 settings:false)。但 footer 里还有
+      // 另一个真行——账号行,它就是本按钮该长成的样子:不抄它的类名、也不量它的
+      // 盒,直接按 dsh 的设计变量把同一套几何写死(见 ensureFallbackStyle)。
+      // 早先那版量账号行的盒再 setInterval 轮询对齐,既依赖「插槽的兄弟就是账号行」
+      // (实际中间还隔着一层 display:contents 的插槽壳,永远量不到),又要跟 rail
+      // 切换、窗口缩放赛跑——几何对齐不该靠 JS 追。
+      ensureFallbackStyle()
+    }
     // dsh 的语言能在设置里当场切,这个标签跟着换
     new MutationObserver(function () {
       var next = framed ? tx('我的电脑', 'My computers') : tx('连接手机', 'Connect a phone')
@@ -760,6 +820,68 @@ function injectNarrowScreenCss(html) {
       var span = button.querySelector('[data-dsh-tether="hosts-label"]')
       if (span) span.textContent = next
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] })
+  }
+
+  // 桌面端(dsh-desktop)专用:没有 settings.trigger 可抄,就按 dsh 自己的设计
+  // 变量复刻 footer 里那一行的几何。参照物是紧邻的账号行(settings.launcher 里的
+  // AccountMenu):实测 6px 内边距、8px 图标间距、14px 字号、radius-md,外层
+  // triggerRow 用 calc(100% + 4px) 宽 + -2px 左右外边距,让悬停底色比内容再外扩
+  // 2px。这里逐项照抄,只吃 --dsw-* 变量:明暗主题、圆角、焦点环、悬停底色全部
+  // 跟随 dsh 自己的主题,一个硬编码色值都不留,也不碰任何 CSS Module 类名。
+  //
+  // 高度取 36 而非账号行的 44:36 正好是 6×2 内边距 + 24px 图标槽,内容贴边不留
+  // 空,也是 dsh 自己的行高(panelRow 的 min-height、收起态按钮都是 36)。
+  //
+  // 下边距 -4px:两行本来各带 triggerRow 那套 4px 上下边距,flex 布局里外边距不会
+  // 合并,相邻两个就是 8px 的缝。抵消掉账号行那 4px 上边距,两行的悬停底色才真正
+  // 相邻;上边距留 4px,和上面被裁掉的工作区列表之间留一点呼吸位。这条只长在桌面端
+  // 的兜底样式里 —— 浏览器侧照抄「设置」的类名,外观分毫不动。
+  var fallbackStyleInstalled = false
+  function ensureFallbackStyle() {
+    if (fallbackStyleInstalled) return
+    fallbackStyleInstalled = true
+    var style = document.createElement('style')
+    style.setAttribute('data-dsh-tether', 'fallback-style')
+    style.textContent = [
+      '[data-dsh-tether="hosts-row"] {',
+      '  box-sizing: border-box; flex: none;',
+      '  width: calc(100% + 4px); margin: 4px -2px -4px;',
+      '  display: flex; align-items: center;',
+      '}',
+      '[data-dsh-tether="hosts-row"] > [data-dsh-tether="hosts-trigger"] {',
+      '  -webkit-appearance: none; appearance: none;',
+      '  box-sizing: border-box; flex: 1 1 auto; min-width: 0;',
+      '  display: flex; align-items: center; gap: 8px;',
+      '  height: 36px; margin: 0; padding: 6px;',
+      '  border: none; border-radius: var(--dsw-radius-md);',
+      '  background: transparent; color: var(--dsw-alias-label-primary);',
+      '  font: inherit; font-size: 14px; line-height: 22px;',
+      '  text-align: left; cursor: pointer; user-select: none; overflow: hidden;',
+      '}',
+      '[data-dsh-tether="hosts-row"] > [data-dsh-tether="hosts-trigger"]:hover {',
+      '  background: var(--dsw-alias-interactive-bg-hover);',
+      '}',
+      '[data-dsh-tether="hosts-row"] > [data-dsh-tether="hosts-trigger"]:focus-visible {',
+      '  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));',
+      '  outline-offset: -2px;',
+      '}',
+      // 16px 字形放进 24px 槽位居中:与账号行 24px 的头像同宽同轴,两行文字因此左对齐
+      '[data-dsh-tether="hosts-row"] [data-dsh-tether="hosts-icon"] {',
+      '  flex: none; width: 24px; height: 24px;',
+      '  display: inline-flex; align-items: center; justify-content: center;',
+      '}',
+      '[data-dsh-tether="hosts-row"] [data-dsh-tether="hosts-label"] {',
+      '  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
+      '}',
+      // 收起成图标条时照账号行的收起态:36×36 居中、藏起文字。
+      // 状态信号用 dsh 自己写在 frame 上的 data-sidebar-collapsed,不靠类名。
+      '[data-sidebar-collapsed] [data-dsh-tether="hosts-row"] { width: 36px; margin: 8px 0 10px; }',
+      '[data-sidebar-collapsed] [data-dsh-tether="hosts-row"] > [data-dsh-tether="hosts-trigger"] {',
+      '  flex: none; justify-content: center; gap: 0; width: 36px; height: 36px; padding: 0;',
+      '}',
+      '[data-sidebar-collapsed] [data-dsh-tether="hosts-row"] [data-dsh-tether="hosts-label"] { display: none; }',
+    ].join('\\n')
+    document.head.append(style)
   }
   mountHostsTrigger()
   new MutationObserver(mountHostsTrigger).observe(document.documentElement, { childList: true, subtree: true })
@@ -777,11 +899,6 @@ function injectNarrowScreenCss(html) {
       .catch(function (e) { viewer(tx('配置文件', 'Config file'), '', String(e && e.message ? e.message : e)) })
   }, true)
 })()`
-  return html.replace(
-    '</head>',
-    `<style data-dsh-tether="narrow-screen">${css}\n</style><script data-dsh-tether="narrow-screen">${script}\n</script></head>`,
-  )
-}
 
 /**
  * sidecar 二进制的解析顺序:
