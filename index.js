@@ -490,8 +490,9 @@ const tetherCss = `
   }
   /* 侧栏展开时主框架把网格从「56px 内容」改成「280px 内容」,对话区被压到
      140px。改成抽屉:网格保持收起时的列宽,侧栏浮到内容之上盖住一部分。
-     展开态没有专门的类名,但展开才会出现拖拽把手,用它作状态信号。
-     把手本身在手机上没用(没法拖),隐掉。 */
+     展开态读 dsh 自己写在 frame 上的 data-sidebar-collapsed(收起为 "true",
+     展开时该属性不在),0.1.0-rc.7 起每个版本都带。把手本身在手机上没用
+     (没法拖),隐掉。 */
   /* 网格恒定为收起时的列宽,侧栏恒定绝对定位、只让宽度随展开态变化——
      position 不可过渡,只有始终 absolute 才能做出滑入滑出的动画。
      侧栏脱离文档流后剩下的子元素会整体上移一列(对话区掉进 56px 那列,
@@ -512,8 +513,7 @@ const tetherCss = `
     z-index: 30 !important;
     transition: width 220ms ease, box-shadow 220ms ease;
   }
-  /* 展开态没有专门的类名,但展开才会出现拖拽把手,用它作状态信号 */
-  [class*="_frame"]:has(> [class*="_handle"]) > [class*="sidebarCol"] {
+  [class*="_frame"]:not([data-sidebar-collapsed="true"]) > [class*="sidebarCol"] {
     width: min(300px, 84vw) !important;
     box-shadow: 0 10px 36px rgba(0, 0, 0, 0.24);
   }
@@ -529,12 +529,12 @@ const tetherCss = `
     pointer-events: none;
     transition: opacity 220ms ease;
   }
-  [class*="_frame"]:has(> [class*="_handle"])::after { opacity: 1; }
+  [class*="_frame"]:not([data-sidebar-collapsed="true"])::after { opacity: 1; }
   [class*="_frame"] > [class*="_handle"] { display: none !important; }
 
   /* 侧栏收起时是图标条,「主机」按钮的文字跟着藏起来,和 dsh 自己的按钮一致 */
   [data-dsh-tether="hosts-label"] { display: none; }
-  [class*="_frame"]:has(> [class*="_handle"]) [data-dsh-tether="hosts-label"] { display: inline; }
+  [class*="_frame"]:not([data-sidebar-collapsed="true"]) [data-dsh-tether="hosts-label"] { display: inline; }
   @media (prefers-reduced-motion: reduce) {
     [class*="_frame"] > [class*="sidebarCol"],
     [class*="_frame"]::after { transition: none; }
@@ -570,7 +570,8 @@ const tetherScript = `
   document.addEventListener('pointerdown', function (event) {
     if (!narrow.matches) return
     var frame = document.querySelector('[class*="_frame"]')
-    if (!frame || !frame.querySelector(':scope > [class*="_handle"]')) return
+    // 抽屉开着才有「点外面收起来」可言;判据和样式那边同一个
+    if (!frame || frame.getAttribute('data-sidebar-collapsed') === 'true') return
     var drawer = frame.querySelector(':scope > [class*="sidebarCol"]')
     if (!drawer || drawer.contains(event.target)) return
     var toggle = document.querySelector('button[aria-label*="侧边栏"], button[aria-label*="sidebar" i]')
