@@ -497,7 +497,10 @@ const tetherCss = `
      position 不可过渡,只有始终 absolute 才能做出滑入滑出的动画。
      侧栏脱离文档流后剩下的子元素会整体上移一列(对话区掉进 56px 那列,
      反而更窄),所以显式钉住列号。 */
-  [class*="_frame"] {
+  /* 只认最外层那个 frame。dsh 里好几个组件的局部类名也带 _frame(会话区、
+     附件缩略图、子代理、文档预览),它们都长在它里面:附件缩略图自己是个
+     单格网格,被这条列模板改掉后图片会挤进 56px 的第一列。 */
+  [class*="_frame"]:not([class*="_frame"] *) {
     grid-template-columns: 56px minmax(0, 1fr) 0px !important;
   }
   [class*="_frame"] > [class*="centerCol"] { grid-column: 2 !important; }
@@ -519,7 +522,7 @@ const tetherCss = `
   }
   /* 抽屉下的内容压暗。指针不拦——收起由注入的脚本接管,拦了反而会在脚本
      未生效时把整页点死。 */
-  [class*="_frame"]::after {
+  [class*="_frame"]:not([class*="_frame"] *)::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -529,7 +532,7 @@ const tetherCss = `
     pointer-events: none;
     transition: opacity 220ms ease;
   }
-  [class*="_frame"]:not([data-sidebar-collapsed="true"])::after { opacity: 1; }
+  [class*="_frame"]:not([class*="_frame"] *):not([data-sidebar-collapsed="true"])::after { opacity: 1; }
   [class*="_frame"] > [class*="_handle"] { display: none !important; }
 
   /* 侧栏收起时是图标条,「主机」按钮的文字跟着藏起来,和 dsh 自己的按钮一致 */
