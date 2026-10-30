@@ -650,7 +650,13 @@ const tetherScript = `
   // 这里放「主机」按钮,点了让外层的手机客户端打开它自己的主机页。
   // 同一个按钮两种归宿:手机 App 里打开它自己的主机页;电脑浏览器里出示配对串,
   // 好让用户换手机、加设备时有地方拿新配对码(否则只能去删 paired.json)。
-  var framed = window.parent !== window
+  // 判据是「App 自己挂的标记」,不是「我在不在 iframe 里」:dsh 桌面端的插件界面
+  // 同样跑在宿主的内嵌 frame 里,按 window.parent !== window 判会被当成手机 App,
+  // 按钮变「我的电脑」、点了只往父窗口发一条消息——桌面端没有这条消息的监听者,
+  // 按钮就是死的。标记拿不到一律按浏览器处理,出示配对串,至少点得动;
+  // 0.1.24 及更早的 App 没有这个标记,在 App 里也会出示配对串(它自己的顶栏有
+  // 「主机」入口,功能不丢)。
+  var inApp = !!window.__DSH_TETHER_APP__
 
   // 已配对手机列表。白名单每条都持有访问权,而手机重装 App 会换身份密钥,
   // 旧条目就此变成没人认识的常驻凭证——这里是撤销它们的地方。
@@ -804,7 +810,7 @@ const tetherScript = `
     var button = document.createElement('button')
     button.type = 'button'
     button.setAttribute('data-dsh-tether', 'hosts-trigger')
-    var label = framed ? tx('我的电脑', 'My computers') : tx('连接手机', 'Connect a phone')
+    var label = inApp ? tx('我的电脑', 'My computers') : tx('连接手机', 'Connect a phone')
     button.setAttribute('aria-label', label)
     // 浏览器侧沿用原来那个 18px 图标,一字不改;抄不到「设置」时按参照行的尺寸画
     var icon = reference === null || reference.browser
@@ -812,7 +818,7 @@ const tetherScript = `
       : phoneIcon(referenceIconWidth(reference.trigger))
     button.innerHTML = icon + '<span data-dsh-tether="hosts-label">' + label + '</span>'
     button.addEventListener('click', function () {
-      if (framed) window.parent.postMessage({ type: 'dsh-tether:open-hosts' }, '*')
+      if (inApp) window.parent.postMessage({ type: 'dsh-tether:open-hosts' }, '*')
       else showPairing()
     })
     row.append(button)
@@ -854,7 +860,7 @@ const tetherScript = `
     }
     // dsh 的语言能在设置里当场切,这个标签跟着换
     new MutationObserver(function () {
-      var next = framed ? tx('我的电脑', 'My computers') : tx('连接手机', 'Connect a phone')
+      var next = inApp ? tx('我的电脑', 'My computers') : tx('连接手机', 'Connect a phone')
       button.setAttribute('aria-label', next)
       var span = button.querySelector('[data-dsh-tether="hosts-label"]')
       if (span) span.textContent = next

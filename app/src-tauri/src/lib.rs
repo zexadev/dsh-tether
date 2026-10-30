@@ -506,6 +506,13 @@ pub fn run() {
             // 而 dsh 页面活在 iframe 里,只挂主 frame 够不着它。窗口属性仍在 tauri.conf.json。
             tauri::WebviewWindowBuilder::from_config(app.handle(), &app.config().app.windows[0])?
                 .initialization_script_for_all_frames(include_str!("../webview-compat.js"))
+                // 主机页里的插件界面靠这个标记认出「我长在这个 App 里」。它不能靠
+                // window.parent !== window 自己判:dsh 桌面端的插件界面也在内嵌
+                // frame 里,那样判会把桌面端当成手机。谁是 App 谁挂标记。
+                .initialization_script_for_all_frames(format!(
+                    "window.__DSH_TETHER_APP__ = {:?};",
+                    env!("CARGO_PKG_VERSION")
+                ))
                 .build()?;
             Ok(())
         })
