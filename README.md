@@ -17,7 +17,7 @@
   <a href="../../releases"><img src="https://img.shields.io/github/downloads/zexadev/dsh-tether/total?style=flat&label=downloads&color=4D6BFE" alt="Downloads"></a>
   <a href="../../stargazers"><img src="https://img.shields.io/github/stars/zexadev/dsh-tether?style=flat&label=%E2%98%85&color=08C" alt="Stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2EA44F?style=flat" alt="MIT"></a>
-  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7%20%7C%20rc.8%20%7C%200.1.2%20%7C%200.1.5%20%7C%200.1.6%20%7C%200.1.7%20%7C%200.2.0%20%7C%200.2.1-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7 | rc.8 | 0.1.2 | 0.1.5 | 0.1.6 | 0.1.7 | 0.2.0 | 0.2.1">
+  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7%20%7C%20rc.8%20%7C%200.1.2%20%7C%200.1.5%20%7C%200.1.6%20%7C%200.1.7%20%7C%200.2.0%20%7C%200.2.1%20%7C%200.2.2-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7 | rc.8 | 0.1.2 | 0.1.5 | 0.1.6 | 0.1.7 | 0.2.0 | 0.2.1 | 0.2.2">
   <img src="https://img.shields.io/badge/Android-4493F8?style=flat" alt="Android">
   <img src="https://img.shields.io/badge/iOS-beta-8E8E93?style=flat" alt="iOS beta">
   <a href="https://www.dsh.so/artifact/dsh-tether"><img src="https://www.dsh.so/badge/dsh-tether.svg" alt="dsh.so security scan"></a>
@@ -137,7 +137,7 @@ The Termux route still works if you prefer it: install dsh and this plugin insid
 - The interface on the phone is DSH's own; the narrow-screen fit comes from minimal injected styles, so a dsh layout change may need a follow-up here.
 - English and Chinese: the app follows your phone's system language, terminal output follows the computer's, and the part injected into the dsh interface follows dsh's own language setting. There is no separate language switch.
 - Local mode exists only in the `arm64` build, never on iOS; the phone lacks bash and a full coreutils, so shell-dependent tools are incomplete. The `arm64` APK is about 83 MB because of the bundled runtime; the others are about 32 MB.
-- Verified against dsh **`0.1.0-rc.7`**, **`0.1.0-rc.8`**, **`0.1.2`** (alpha and rc.1), **`0.1.5-alpha.1`**, **`0.1.5-rc.2`**, **`0.1.6-alpha.2`**, **`0.1.7-rc.2`**, **`0.2.0-rc.2`**, **`0.2.1-alpha.1`**, **`0.2.1-alpha.2`** and **`0.2.1-rc.2`**. dsh is in developer preview — check this line before assuming a newer dsh works. From 0.1.7 dsh refuses to install a plugin whose declared range does not cover it, so a version outside this line is a refusal at install time rather than a silent risk. The browser authentication dsh introduced in 0.1.2-alpha is handled entirely on the machine side; the phone app needs no update for it.
+- Verified against dsh **`0.1.0-rc.7`**, **`0.1.0-rc.8`**, **`0.1.2`** (alpha and rc.1), **`0.1.5-alpha.1`**, **`0.1.5-rc.2`**, **`0.1.6-alpha.2`**, **`0.1.7-rc.2`**, **`0.2.0-rc.2`**, **`0.2.1-alpha.1`**, **`0.2.1-alpha.2`**, **`0.2.1-rc.2`**, **`0.2.1-rc.3`**, **`0.2.1-rc.5`** and **`0.2.2-alpha.2`**. dsh is in developer preview — check this line before assuming a newer dsh works. From 0.1.7 dsh refuses to install a plugin whose declared range does not cover it, so a version outside this line is a refusal at install time rather than a silent risk. The browser authentication dsh introduced in 0.1.2-alpha is handled entirely on the machine side; the phone app needs no update for it.
 
 ## What has been verified
 

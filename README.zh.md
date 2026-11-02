@@ -17,7 +17,7 @@
   <a href="../../releases"><img src="https://img.shields.io/github/downloads/zexadev/dsh-tether/total?style=flat&label=downloads&color=4D6BFE" alt="下载量"></a>
   <a href="../../stargazers"><img src="https://img.shields.io/github/stars/zexadev/dsh-tether?style=flat&label=%E2%98%85&color=08C" alt="Stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2EA44F?style=flat" alt="MIT"></a>
-  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7%20%7C%20rc.8%20%7C%200.1.2%20%7C%200.1.5%20%7C%200.1.6%20%7C%200.1.7%20%7C%200.2.0%20%7C%200.2.1-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7 | rc.8 | 0.1.2 | 0.1.5 | 0.1.6 | 0.1.7 | 0.2.0 | 0.2.1">
+  <img src="https://img.shields.io/badge/dsh-0.1.0--rc.7%20%7C%20rc.8%20%7C%200.1.2%20%7C%200.1.5%20%7C%200.1.6%20%7C%200.1.7%20%7C%200.2.0%20%7C%200.2.1%20%7C%200.2.2-4D6BFE?style=flat" alt="dsh 0.1.0-rc.7 | rc.8 | 0.1.2 | 0.1.5 | 0.1.6 | 0.1.7 | 0.2.0 | 0.2.1 | 0.2.2">
   <img src="https://img.shields.io/badge/Android-4493F8?style=flat" alt="Android">
   <img src="https://img.shields.io/badge/iOS-%E6%B5%8B%E8%AF%95%E7%89%88-8E8E93?style=flat" alt="iOS 测试版">
   <a href="https://www.dsh.so/artifact/dsh-tether"><img src="https://www.dsh.so/badge/dsh-tether.svg" alt="dsh.so 安全扫描"></a>
@@ -137,7 +137,7 @@ dsh plugin --profile web add .
 - 手机上的界面是 DSH 自己的,窄屏适配靠注入的最小样式完成;dsh 改版式时可能需要跟进。
 - 中英双语:App 界面跟随手机的系统语言;电脑终端上的输出跟随电脑的系统语言;注入 dsh 界面的那部分跟随 dsh 自己的语言设置。没有单独的语言开关。
 - 本地模式只有 `arm64` 包有,iOS 没有;手机上没有 bash 与完整 coreutils,依赖 shell 的工具用不全。arm64 包因内置运行时约 83 MB,其余包约 32 MB。
-- 已针对 dsh **`0.1.0-rc.7`**、**`0.1.0-rc.8`**、**`0.1.2`**(alpha 与 rc.1)、**`0.1.5-alpha.1`**、**`0.1.5-rc.2`**、**`0.1.6-alpha.2`**、**`0.1.7-rc.2`**、**`0.2.0-rc.2`**、**`0.2.1-alpha.1`**、**`0.2.1-alpha.2`** 与 **`0.2.1-rc.2`** 验证。dsh 处于 developer preview,换更新的 dsh 之前先看这一行。0.1.7 起 dsh 会拒绝安装声明范围没覆盖自己的插件,所以这一行之外的版本是装不上,而不是装上了埋雷。dsh 0.1.2-alpha 引入的浏览器认证完全在电脑侧处理,手机 App 无需更新。
+- 已针对 dsh **`0.1.0-rc.7`**、**`0.1.0-rc.8`**、**`0.1.2`**(alpha 与 rc.1)、**`0.1.5-alpha.1`**、**`0.1.5-rc.2`**、**`0.1.6-alpha.2`**、**`0.1.7-rc.2`**、**`0.2.0-rc.2`**、**`0.2.1-alpha.1`**、**`0.2.1-alpha.2`**、**`0.2.1-rc.2`**、**`0.2.1-rc.3`**、**`0.2.1-rc.5`** 与 **`0.2.2-alpha.2`** 验证。dsh 处于 developer preview,换更新的 dsh 之前先看这一行。0.1.7 起 dsh 会拒绝安装声明范围没覆盖自己的插件,所以这一行之外的版本是装不上,而不是装上了埋雷。dsh 0.1.2-alpha 引入的浏览器认证完全在电脑侧处理,手机 App 无需更新。
 
 ## 验证过什么
 
