@@ -2,6 +2,28 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.25
+
+### 修复
+
+- **窄屏下侧栏卡在 56px:标签文字渲染出来却被裁掉,侧栏开关也找不到**([#22](https://github.com/zexadev/dsh-tether/issues/22))。0.1.24 的窄屏样式用「主框架下有没有拖拽把手」判断侧栏是否展开,这个判据要靠 `:has()`。有的厂商 WebView 会把带 `:has()` 的规则整条丢掉(报告机型:华为 Mate 50 / HarmonyOS 4.2),于是「展开时侧栏 300px」那条不生效,而 dsh 自己处在展开态——标签照常渲染,被 56px 的盒子裁成每行一两个字;开关只在收起态渲染,页面上也找不到,界面就卡在这个混态。现在改读 dsh 写在主框架上的 `data-sidebar-collapsed`(收起为 `"true"`,展开时属性不存在),不再用 `:has()`;插件声明支持的五段 dsh 范围各取一版查过,这个属性每版都有。拖拽把手那条规则一并删掉,手机上它本来也拖不动。实测 480×1056:收起侧栏 57px、无遮罩、「主机」标签隐藏;按开关 301px、遮罩出现、标签显示;点内容区收回。
+- **dsh 桌面端里「我的电脑」按钮点了没有任何反应**([#23](https://github.com/zexadev/dsh-tether/issues/23))。按钮的文案和行为原本按 `window.parent !== window` 判断「是不是在 tether 手机 App 里」,而 dsh 桌面端的插件界面同样跑在宿主的内嵌 frame 里,于是桌面端被当成手机:按钮显示「我的电脑」,点击只向父窗口发一条 `dsh-tether:open-hosts` 消息——桌面宿主没有这条消息的监听者,按钮因此是死的,也没有别的出路。现在改成 App 建窗口时往所有 frame 注入 `window.__DSH_TETHER_APP__`,谁是 App 谁挂标记;拿不到标记一律按浏览器处理,当场出示配对串。桌面端因此也能拿到配对串(换手机、加设备时用),不必再手动开浏览器访问本机地址。这条要配新版 App 才完整:老 App 没有这个标记,装上新插件后按钮会显示「连接手机」并出示配对串。
+- **窄屏下附件缩略图被挤变形**(修 #22 时发现)。窄屏那几条规则用 `[class*="_frame"]` 选主框架,但 dsh 的会话区、附件缩略图、子代理、文档预览的局部类名也带 `_frame`,而且都长在主框架里面。附件缩略图自己是个单格网格,被 `grid-template-columns: 56px minmax(0,1fr) 0px` 改成三列之后,图片挤进 56px 的第一列;侧栏遮罩那条同理会糊在每个嵌套元素上。这几条现在限定成「带 `_frame` 且不在任何 `_frame` 里面」。
+
+### 变更
+
+- 声明支持 dsh `0.2.1-rc.5` 与 `0.2.2-alpha.2`。dsh 从 0.1.7 起会拒装声明范围没覆盖自己的插件,所以 0.2.2-alpha 线上原本装不上。两个版本都实跑验证过:布局包的类名与 `data-sidebar-collapsed` 和 0.2.1-rc.3 逐字相同,抽屉、设置弹窗、侧栏按钮行为一致。APK 内置的 dsh 仍是 `0.2.1-rc.2`,本次不动。
+
+### English
+
+On a narrow screen the sidebar could get stuck at 56px with its labels rendered but clipped and no sidebar toggle in sight ([#22](https://github.com/zexadev/dsh-tether/issues/22)). The narrow-screen styling in 0.1.24 decided whether the sidebar was expanded by looking for the drag handle under the frame, which needs `:has()`. Some vendor WebViews drop every rule containing `:has()` (reported on a Huawei Mate 50 running HarmonyOS 4.2), so the "sidebar is 300px when expanded" rule never applied while dsh itself was in the expanded state: the labels rendered and were clipped to one or two characters by the 56px box, and the toggle is only rendered while collapsed, so there was no way out of that mixed state. The expanded state is now read from `data-sidebar-collapsed`, which dsh writes on the frame itself (`"true"` when collapsed, absent when expanded), with no `:has()` involved; the attribute was checked in one version from each of the five dsh ranges the plugin declares. The drag-handle rule is gone as well — it was never draggable on a phone. Measured at 480×1056: collapsed sidebar 57px, no veil, hosts label hidden; after the toggle 301px with the veil and the label; tapping the content column collapses it again.
+
+In the dsh desktop app the "My computers" button did nothing when clicked ([#23](https://github.com/zexadev/dsh-tether/issues/23)). The label and the behaviour were chosen by `window.parent !== window`, meant to detect "running inside the tether phone app", but the plugin UI in the dsh desktop shell also lives in an embedded frame, so the desktop was treated as a phone: the button read "My computers" and a click only posted `dsh-tether:open-hosts` to the parent window — which the desktop shell does not listen for, leaving the button dead with nothing else to fall back on. The app now injects `window.__DSH_TETHER_APP__` into every frame when it creates the window, so whoever is the app says so; without that marker the plugin treats the page as a browser and shows the pairing string. Desktop users can therefore get the pairing string (for a new phone or an extra device) without opening a browser by hand. This one needs the new app build to be complete: an older app does not set the marker, so with the new plugin its button reads "Connect a phone" and shows the pairing string.
+
+Attachment thumbnails were squeezed out of shape on narrow screens (found while fixing #22). Those narrow-screen rules selected the frame with `[class*="_frame"]`, but the conversation area, attachment thumbnails, subagent and document-preview components all carry local class names containing `_frame` and all live inside the frame. An attachment thumbnail is a single-cell grid, so `grid-template-columns: 56px minmax(0,1fr) 0px` turned it into three columns and pushed the image into the 56px first column, and the sidebar veil would likewise be painted over every nested element. Those rules are now restricted to a `_frame` that is not inside another `_frame`.
+
+Support is now declared for dsh `0.2.1-rc.5` and `0.2.2-alpha.2`. Since 0.1.7 dsh refuses to install a plugin whose declared range does not cover it, so the 0.2.2-alpha line could not install this plugin at all. Both versions were verified by running them: the layout package class names and `data-sidebar-collapsed` are identical to 0.2.1-rc.3, and the drawer, settings dialog and sidebar button all behave the same. The dsh bundled inside the APK stays at `0.2.1-rc.2`.
+
 ## 0.1.24
 
 ### 修复
