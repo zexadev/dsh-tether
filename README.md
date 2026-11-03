@@ -149,6 +149,48 @@ Pairing (including a wrong code being refused), approval delivery, and switching
 
 Local mode was verified on a Redmi running Android 16: a fresh install reaches a working interface in 9.1 seconds (runtime unpacking included) and later starts take 2.1 seconds; the node process survives 30 seconds in the background; force-stopping the app and reopening it restores local mode automatically.
 
+## FAQ
+
+### Do I need a public IP, a server of my own, or the same Wi-Fi?
+
+No. The phone and the machine hole-punch to each other through iroh; there is no account and nothing to deploy. Only a failed punch falls back to a relay, and that relay carries ciphertext it cannot read. If your phone only ever sits on the same Wi-Fi as your machine, a plain LAN setup is simpler and you do not need this.
+
+### Does it work with the phone on 4G/5G and the machine on home broadband?
+
+Yes, and that is the path that has been verified on a real device: Wi-Fi off, 5G only, machine on home broadband, the plugin reported a direct public path and the relay was never used (see [What has been verified](#what-has-been-verified)). The relay fallback itself has not yet been triggered on a real network.
+
+### Is there an iOS app?
+
+A beta. Every release ships an unsigned IPA; sign it yourself with AltStore, Sideloadly or similar (a free Apple ID expires after 7 days). It is built only in CI and this project has never run it on a real device. Local mode is Android-only, because iOS forbids child processes.
+
+### Can I use it with no computer at all?
+
+On Android, yes. The `arm64` APK bundles Node 24 and dsh `0.2.1-rc.2`; **Hosts → Run on this phone** starts DSH on the phone itself, with no Termux, no commands and no root. That bundle is why the `arm64` APK is about 83 MB. The phone has no bash and no full coreutils, so shell-dependent tools are incomplete; chat and file read/write are unaffected.
+
+### Can I open it as a web page (H5) or a WeChat mini program instead of installing the app?
+
+No. The app owns an iroh endpoint (QUIC with a custom ALPN) and feeds the DSH interface into its WebView through a loopback proxy; a browser page cannot make that connection, and a mini program's `<web-view>` only loads whitelisted business domains. Doing it from a browser would need a server in the middle, which is exactly what this project avoids ([#11](https://github.com/zexadev/dsh-tether/issues/11)).
+
+### Which dsh versions are supported?
+
+The list under [Known limitations](#known-limitations), currently `0.1.0-rc.7` through `0.2.2-alpha.2`. From dsh 0.1.7 the install is refused outright when the declared range does not cover your dsh, so an unsupported version fails at install time instead of silently misbehaving.
+
+### The interface sits at "Loading workspace…", or "Select workspace" reports `AbortSignal.any is not a function`
+
+Fixed in 0.1.24. Older system WebViews (Huawei and others still ship Chromium 114) lack `Promise.withResolvers` and `AbortSignal.any`, which the dsh 0.2.1-rc frontend uses; the app now supplies both when the WebView lacks them ([#20](https://github.com/zexadev/dsh-tether/issues/20)).
+
+### After sitting idle the app is stuck on "Reconnecting"
+
+Fixed in 0.1.24 ([#19](https://github.com/zexadev/dsh-tether/issues/19)): a dead link was never reported and the phone-side proxy port was not released. Upgrade to 0.1.24 or later.
+
+### How is this different from ds-harness-remote or DSH Desktop?
+
+See the table under [The case it solves](#compared-with-similar-projects). In short: no account and no server here, direct first with a ciphertext-only relay as fallback, Android local mode, MIT; ds-harness-remote signs in to its service and offers PC / Android / Web; DSH Desktop expects the same Wi-Fi or a Tailscale network you set up.
+
+### Is this an official DeepSeek project?
+
+No. It is an independent community project; see [Relationship to DeepSeek Harness](#relationship-to-deepseek-harness).
+
 ## Relationship to DeepSeek Harness
 
 <p align="center"><img src="assets/dsh-mark.svg" height="36" alt="DeepSeek Harness"></p>

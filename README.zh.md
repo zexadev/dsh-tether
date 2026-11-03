@@ -156,6 +156,48 @@ dsh plugin --profile web add .
 
 本地模式在 Redmi(Android 16)真机验证:全新安装后首次启动到界面出现 9.1 秒(含解压运行时),之后启动 2.1 秒;退后台 30 秒 node 进程仍在;强杀 App 后重开自动恢复到本地模式。
 
+## 常见问题
+
+### 需要公网 IP、自己的服务器,或者同一个 WiFi 吗?
+
+都不需要。手机和电脑通过 iroh 互相打洞直连,不注册账号、不部署任何东西;打不通才退回 relay,relay 上过的只是它读不懂的密文。如果你的手机永远和电脑在同一个 WiFi 里,直接走局域网更简单,用不上这个。
+
+### 手机走 4G/5G、电脑在家宽,能连上吗?
+
+能,而且这正是真机验证过的那条路:手机关 WiFi 只走 5G、电脑在家宽,插件侧报出公网直连路径,relay 全程没用上(见[验证过什么](#验证过什么))。打洞失败退回 relay 这条路径本身,尚未在真实网络下触发过。
+
+### 有 iOS 版吗?
+
+有,测试版。每个 Release 都带未签名的 ipa,用 AltStore、Sideloadly 一类工具自签安装(免费 Apple ID 签出来的 7 天过期)。它只在 CI 上构建,本项目没有在真机上跑过。本地模式只有 Android 有,iOS 禁止子进程。
+
+### 手边完全没有电脑,能用吗?
+
+Android 可以。`arm64` 包内置了 Node 24 和 dsh `0.2.1-rc.2`,**主机 → 在本机运行**就能在手机上把 DSH 跑起来,不装 Termux、不敲命令、不用 root;arm64 包约 83 MB 就是因为这个。手机上没有 bash 和完整 coreutils,依赖 shell 的工具用不全,对话和读写文件不受影响。
+
+### 能不装 App,用手机网页(H5)或微信小程序访问吗?
+
+不能。App 自己带一个 iroh 端点(自定义 ALPN 的 QUIC),再经手机本地的回环代理把 DSH 界面灌进 WebView;浏览器页面建不起这种连接,小程序的 `<web-view>` 也只能加载白名单里的业务域名。要在浏览器里用,中间必须常驻一台服务器,而这正是本项目要避开的([#11](https://github.com/zexadev/dsh-tether/issues/11))。
+
+### 支持哪些 dsh 版本?
+
+见[已知限制](#已知限制)里那一行,目前是 `0.1.0-rc.7` 到 `0.2.2-alpha.2`。dsh 0.1.7 起,声明范围没覆盖到的 dsh 会在安装时直接拒绝,所以不支持的版本是装不上,而不是装上了乱跑。
+
+### 界面停在「正在加载工作区…」,或点「选择工作区」报 `AbortSignal.any is not a function`
+
+0.1.24 已修。华为等厂商随系统发的旧 WebView 还停在 Chromium 114,没有 dsh 0.2.1-rc 前端用到的 `Promise.withResolvers` 和 `AbortSignal.any`;现在 App 在 WebView 缺这两个 API 时自行补上([#20](https://github.com/zexadev/dsh-tether/issues/20))。
+
+### 放一段时间后卡在「重新连接中」不恢复
+
+0.1.24 已修([#19](https://github.com/zexadev/dsh-tether/issues/19)):断链没有上报、手机侧代理端口没有释放。升级到 0.1.24 及以上。
+
+### 和 ds-harness-remote、DSH Desktop 有什么区别?
+
+见[它解决什么](#与同类项目的区别)下面的表。一句话:这里不注册、不架服务器,直连优先、退回时 relay 只见密文,Android 有本地模式,MIT;ds-harness-remote 要登录它的服务,提供 PC / Android / Web;DSH Desktop 要同一个 WiFi 或你自己搭的 Tailscale 网络。
+
+### 这是 DeepSeek 官方项目吗?
+
+不是,是独立的社区项目,见[与 DeepSeek Harness 的关系](#与-deepseek-harness-的关系)。
+
 ## 与 DeepSeek Harness 的关系
 
 <p align="center"><img src="assets/dsh-mark.svg" height="36" alt="DeepSeek Harness"></p>
