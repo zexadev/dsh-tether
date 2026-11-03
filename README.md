@@ -8,6 +8,8 @@
 
 <p align="center"><sub>An independent community project. Not affiliated with, partnered with, authorised by, or endorsed by DeepSeek.<br>No DeepSeek employee or upstream DeepSeek Harness team member is involved in this repository.<br><a href="README.zh.md">中文</a> · English</sub></p>
 
+<p align="center"><sub>Official repository: <a href="https://github.com/zexadev/dsh-tether">github.com/zexadev/dsh-tether</a> — releases and issues live here; forks are not maintained by this project.<br>手机远程使用电脑上的 DeepSeek Harness（dsh）：跨网点对点直连、不用架服务器；Android 还能把 dsh 跑在手机本地。</sub></p>
+
 <p align="center">
   <img src="assets/banner.jpg" alt="Phone tethered directly to a dev machine" width="100%">
 </p>

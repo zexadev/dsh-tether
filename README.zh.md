@@ -8,6 +8,8 @@
 
 <p align="center"><sub>独立的社区开源项目,与深度求索不存在隶属、合作、授权或背书关系。<br>本仓库无深度求索员工或 DeepSeek Harness 上游官方团队成员参与。<br>中文 · <a href="README.md">English</a></sub></p>
 
+<p align="center"><sub>官方仓库:<a href="https://github.com/zexadev/dsh-tether">github.com/zexadev/dsh-tether</a>,发版与 issue 都在这里;各 fork 不由本仓维护。<br>DeepSeek Harness (dsh) remote access from your phone: Android / iOS client, peer-to-peer across networks, no server to set up; Android can also run dsh locally.</sub></p>
+
 <p align="center">
   <img src="assets/banner.jpg" alt="手机与开发机直接相连" width="100%">
 </p>
