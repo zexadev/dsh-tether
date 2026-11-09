@@ -197,9 +197,12 @@ jobs:
           path: '*.ipa'
           if-no-files-found: error
 
+  # 只依赖 sidecar 与 apk,不依赖 ipa:iOS 是试验性目标,它失败或被取消时
+  # (continue-on-error 只兜「失败」,不兜「取消」)不该让 npm 与 GitHub Release
+  # 跟着被跳过。ipa 产物能赶上就一并带上,赶不上就缺席。
   release:
     name: 汇总发布
-    needs: [host, apk, ipa]
+    needs: [host, apk]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
