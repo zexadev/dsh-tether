@@ -111,9 +111,63 @@ function refuse(res) {
   res.end('forbidden')
 }
 
+/**
+ * 挂「应用内浏览」目录选择器(directoryPicker 服务的 browse 后端)。
+ *
+ * 原本这个 host 半边和 client 半边一样,由 cordis.patch.yml 直接 insert 成一条
+ * loader entry。dsh 0.2.2-rc.1 在桌面端(Windows)把默认的 auto 选择器解析成
+ * native(系统对话框),而插件管理器里的「热启用」不重启进程:补丁把 auto 停掉是
+ * 异步卸载 native,新 insert 的 browse 却在 native 还没让位时就注册
+ * `directoryPicker`——一个服务只能注册一次,browse 于是报
+ * `service "directoryPicker" has been registered at <NativeDirectoryPicker>`。
+ * 冷启动没有这个问题(补丁先叠好、auto 根本没挂 native),只有热启用会踩中。
+ *
+ * 所以 host 半边改到这里用代码挂,并带重试:冷启动第一次就成功;热启用时按
+ * 100ms 重试,直到 native 让位。client 半边仍在 patch 里,它不注册该服务。
+ */
+async function mountBrowsePicker(ctx) {
+  let BrowseDirectoryPicker
+  try {
+    ;({ default: BrowseDirectoryPicker } = await import('@deepseek-ai/dsh-host-directory-picker-browse'))
+  } catch (error) {
+    console.error(`[tether] ${tt(
+      '目录浏览后端不可用,手机端「添加工作区」将无法选目录: ',
+      'the browse directory picker is unavailable, so the phone cannot choose a workspace: ',
+    )}${error}`)
+    return
+  }
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try {
+      await ctx.plugin(BrowseDirectoryPicker, {})
+      console.log(`[tether] ${tt(
+        '目录浏览后端已就绪,手机端可浏览选择工作区',
+        'browse directory picker ready; the phone can browse and choose a workspace',
+      )}`)
+      return
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      // 只有「服务已被别人注册」才值得等——native 卸载是异步的,重试即可;
+      // 其它错误(包坏了、配置不合法等)重试也没用,原样打出来。
+      if (!/has been registered/.test(message)) {
+        console.error(`[tether] ${tt(
+          '目录浏览后端注册失败: ',
+          'the browse directory picker failed to register: ',
+        )}${error}`)
+        return
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+  }
+  console.error(`[tether] ${tt(
+    '目录浏览后端迟迟注册不上(默认选择器一直占着 directoryPicker),手机端「添加工作区」不可用',
+    'the browse directory picker never registered (the default picker kept directoryPicker), so the phone cannot add a workspace',
+  )}`)
+}
+
 /** 与 sidecar 无关的部分:窄屏适配注入,以及手机上看配置文件的路由 */
 function applyUi(ctx) {
   mountTetherUi(ctx)
+  void mountBrowsePicker(ctx)
 
   // 「打开配置文件」在宿主机桌面开编辑器,手机上按了毫无反应。这条路由把同一份
   // 文件的内容原样交给手机自己渲染。路径由 Host 侧的 settings.documentPath 决定,
