@@ -2,6 +2,16 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.27
+
+### 修复
+
+- **桌面端热启用插件失败:`service "directoryPicker" has been registered at <NativeDirectoryPicker>`,每次启用或更新插件都要重启应用**。插件的目录选择器补丁一边停用默认的 auto 选择器、一边插入「应用内浏览」后端,两条一起动;冷启动没问题(补丁先叠好、auto 根本没挂 native),但桌面端插件管理器里的热启用不重启进程——loader 并发执行「卸载 auto 挂着的 native」和「激活新插入的 browse」,browse 总是抢在 native 让位之前注册 `directoryPicker` 服务(一个服务只能注册一次),于是整条 entry 报这个错、启用被标失败。现在 host 半边不再由补丁 insert,改由插件 `apply` 用代码注册 `BrowseDirectoryPicker`:撞上「has been registered」就每 100ms 重试,等 native 卸载完再注册,冷启动第一次就成功;client 半边仍在补丁里,它不注册该服务。此后在插件管理器里启用、更新插件都不再需要重启应用,目录选择器行为与之前完全一致(手机经隧道仍走应用内浏览)。
+
+### English
+
+Hot-enabling the plugin in the dsh desktop app failed with `service "directoryPicker" has been registered at <NativeDirectoryPicker>`, so every enable or update needed a full application restart. The plugin's directory-picker patch both disabled the default auto chooser and inserted the in-app browse backend at once; a cold boot was fine — patches compose before anything activates — but the desktop plugin manager's hot enable does not restart the process, and the loader unloads the auto chooser's native backend and activates the newly inserted browse entry concurrently, so browse always registered the one-per-context `directoryPicker` service before native let go, failing that entry and marking the enable as failed. The host half is no longer inserted by the patch: the plugin's `apply` now registers `BrowseDirectoryPicker` from code, retrying every 100 ms on the "has been registered" error until the native backend finishes unloading, while a cold boot succeeds on the first attempt. The client half stays in the patch, since it registers no service. Enabling or updating the plugin in the plugin manager no longer needs an application restart, and the directory picker behaves exactly as before (the phone still browses in-app through the tunnel).
+
 ## 0.1.26
 
 ### 修复
