@@ -2,6 +2,16 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.26
+
+### 修复
+
+- **dsh 0.2.2-rc 上手机打开侧栏变成一块黑、点不动**。0.2.2-rc 起 dsh 在 <768px 自带抽屉:主框架挂 `data-sidebar-drawer`,并渲染一层 `z-index:70` 的遮罩;tether 注入的窄屏抽屉把侧栏钉成 `z-index:30`,侧栏于是被原生遮罩压到下面——深色主题下遮罩是 50% 黑,侧栏看起来就是一块黑,遮罩的 `pointer-events:auto` 又把点击全吞了。现在这段手工抽屉只在 dsh 没有原生抽屉(框架不带 `data-sidebar-drawer`)时生效,原生抽屉出现时整体让位:滑入滑出、遮罩、点外收起都交给 dsh 自己,侧栏里的「连接手机/我的电脑」按钮照常挂载;点外收起那段脚本同样只在没有原生抽屉时接管。老版本 dsh 行为不变。
+
+### English
+
+On dsh 0.2.2-rc and later the sidebar turned into a black block and stopped responding when opened on a phone. Since 0.2.2-rc dsh ships its own drawer below 768px: the frame carries `data-sidebar-drawer` and renders a mask at `z-index:70`, while tether's injected narrow-screen drawer pinned the sidebar to `z-index:30`, so the native mask stacked on top — in dark mode that mask is 50% black, which is exactly the black block, and its `pointer-events:auto` swallowed every tap. The hand-rolled drawer now only applies when dsh has no native drawer (the frame lacks `data-sidebar-drawer`) and steps aside when the native drawer is present, leaving the slide-in/out, the mask and tap-outside-to-close to dsh itself; the "Connect a phone / My computers" button still mounts as usual. Behaviour on older dsh versions is unchanged.
+
 ## 0.1.25
 
 ### 修复
