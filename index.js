@@ -500,14 +500,18 @@ const tetherCss = `
   /* 只认最外层那个 frame。dsh 里好几个组件的局部类名也带 _frame(会话区、
      附件缩略图、子代理、文档预览),它们都长在它里面:附件缩略图自己是个
      单格网格,被这条列模板改掉后图片会挤进 56px 的第一列。 */
-  [class*="_frame"]:not([class*="_frame"] *) {
+  /* dsh 0.2.2-rc 起在 <768px 自带抽屉:frame 挂 data-sidebar-drawer,自带
+     遮罩(z-index 70)与滑入动画。这段手工抽屉只服务没有原生抽屉的旧版本,
+     原生抽屉出现时整体让位——否则我们的 z-index:30 会落到原生遮罩(70)下面,
+     侧栏被遮罩压成一块黑、点也点不到。 */
+  [class*="_frame"]:not([class*="_frame"] *):not([data-sidebar-drawer]) {
     grid-template-columns: 56px minmax(0, 1fr) 0px !important;
   }
-  [class*="_frame"] > [class*="centerCol"] { grid-column: 2 !important; }
+  [class*="_frame"]:not([data-sidebar-drawer]) > [class*="centerCol"] { grid-column: 2 !important; }
   /* 右列 dsh 0.1.5 起从 detailsCol 改名 rightbarCol,两个名字都钉住 */
-  [class*="_frame"] > [class*="detailsCol"],
-  [class*="_frame"] > [class*="rightbarCol"] { grid-column: 3 !important; }
-  [class*="_frame"] > [class*="sidebarCol"] {
+  [class*="_frame"]:not([data-sidebar-drawer]) > [class*="detailsCol"],
+  [class*="_frame"]:not([data-sidebar-drawer]) > [class*="rightbarCol"] { grid-column: 3 !important; }
+  [class*="_frame"]:not([data-sidebar-drawer]) > [class*="sidebarCol"] {
     position: absolute !important;
     top: 0;
     bottom: 0;
@@ -516,13 +520,13 @@ const tetherCss = `
     z-index: 30 !important;
     transition: width 220ms ease, box-shadow 220ms ease;
   }
-  [class*="_frame"]:not([data-sidebar-collapsed="true"]) > [class*="sidebarCol"] {
+  [class*="_frame"]:not([data-sidebar-drawer]):not([data-sidebar-collapsed="true"]) > [class*="sidebarCol"] {
     width: min(300px, 84vw) !important;
     box-shadow: 0 10px 36px rgba(0, 0, 0, 0.24);
   }
   /* 抽屉下的内容压暗。指针不拦——收起由注入的脚本接管,拦了反而会在脚本
      未生效时把整页点死。 */
-  [class*="_frame"]:not([class*="_frame"] *)::after {
+  [class*="_frame"]:not([class*="_frame"] *):not([data-sidebar-drawer])::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -532,15 +536,15 @@ const tetherCss = `
     pointer-events: none;
     transition: opacity 220ms ease;
   }
-  [class*="_frame"]:not([class*="_frame"] *):not([data-sidebar-collapsed="true"])::after { opacity: 1; }
-  [class*="_frame"] > [class*="_handle"] { display: none !important; }
+  [class*="_frame"]:not([class*="_frame"] *):not([data-sidebar-drawer]):not([data-sidebar-collapsed="true"])::after { opacity: 1; }
+  [class*="_frame"]:not([data-sidebar-drawer]) > [class*="_handle"] { display: none !important; }
 
   /* 侧栏收起时是图标条,「主机」按钮的文字跟着藏起来,和 dsh 自己的按钮一致 */
   [data-dsh-tether="hosts-label"] { display: none; }
   [class*="_frame"]:not([data-sidebar-collapsed="true"]) [data-dsh-tether="hosts-label"] { display: inline; }
   @media (prefers-reduced-motion: reduce) {
-    [class*="_frame"] > [class*="sidebarCol"],
-    [class*="_frame"]::after { transition: none; }
+    [class*="_frame"]:not([data-sidebar-drawer]) > [class*="sidebarCol"],
+    [class*="_frame"]:not([data-sidebar-drawer])::after { transition: none; }
   }
 
   /* 触摸时安卓 WebView 会按元素的 DOM 盒子刷一块蓝色高亮,方角、盖住圆角,
@@ -573,8 +577,10 @@ const tetherScript = `
   document.addEventListener('pointerdown', function (event) {
     if (!narrow.matches) return
     var frame = document.querySelector('[class*="_frame"]')
+    // dsh 0.2.2-rc 起自带抽屉,遮罩自己会点外收起;这里只补没有原生抽屉的旧版
+    if (!frame || frame.hasAttribute('data-sidebar-drawer')) return
     // 抽屉开着才有「点外面收起来」可言;判据和样式那边同一个
-    if (!frame || frame.getAttribute('data-sidebar-collapsed') === 'true') return
+    if (frame.getAttribute('data-sidebar-collapsed') === 'true') return
     var drawer = frame.querySelector(':scope > [class*="sidebarCol"]')
     if (!drawer || drawer.contains(event.target)) return
     var toggle = document.querySelector('button[aria-label*="侧边栏"], button[aria-label*="sidebar" i]')
