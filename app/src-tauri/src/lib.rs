@@ -493,6 +493,40 @@ fn notify_request_permission(app: AppHandle) -> bool {
     matches!(app.notification().request_permission().ok(), Some(PermissionState::Granted))
 }
 
+/// 把 dsh 页面里截下来的下载存进系统「下载」目录(见 download-bridge.js)。
+/// 前端把 Blob 读成 base64 传进来;这里落到缓存目录的临时文件,交给插件拷进
+/// 公共「下载」目录并发完成通知,临时文件随后删掉。返回最终文件名(重名时系统
+/// 会改名)。只有安卓实现,其余平台报不支持,下载桥也只注给安卓。
+#[tauri::command]
+async fn save_download(app: AppHandle, name: String, mime: String, data: String) -> Result<String, String> {
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data.as_bytes())
+        .map_err(|e| e.to_string())?;
+    // 名字只取最后一段,去掉路径分隔与控制字符;落盘名再由插件按目录去重
+    let clean: String = name
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or("")
+        .chars()
+        .filter(|c| !c.is_control())
+        .collect();
+    let clean = if clean.trim().is_empty() || clean == "." || clean == ".." { "download".to_string() } else { clean };
+    let dir = app.path().app_cache_dir().map_err(|e| e.to_string())?.join("downloads");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let tmp = dir.join(format!("{stamp}.part"));
+    std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
+    let mime = if mime.is_empty() { "application/octet-stream".to_string() } else { mime };
+    let result = tauri_plugin_dshlocal::save_download(&app, &tmp.to_string_lossy(), &clean, &mime)
+        .map_err(|e| e.to_string());
+    let _ = std::fs::remove_file(&tmp);
+    result
+}
+
 /// 本机 dsh 的最近输出;启动失败时给用户看原因
 #[tauri::command]
 async fn local_log(app: AppHandle) -> Vec<String> {
@@ -540,12 +574,13 @@ pub fn run() {
             keep_alive_start,
             keep_alive_stop,
             notify_permission_state,
-            notify_request_permission
+            notify_request_permission,
+            save_download
         ])
         .setup(|app| {
             // 窗口改在这里建(配置里 create: false):启动脚本只能在建窗口时挂,
             // 而 dsh 页面活在 iframe 里,只挂主 frame 够不着它。窗口属性仍在 tauri.conf.json。
-            tauri::WebviewWindowBuilder::from_config(app.handle(), &app.config().app.windows[0])?
+            let builder = tauri::WebviewWindowBuilder::from_config(app.handle(), &app.config().app.windows[0])?
                 .initialization_script_for_all_frames(include_str!("../webview-compat.js"))
                 // 主机页里的插件界面靠这个标记认出「我长在这个 App 里」。它不能靠
                 // window.parent !== window 自己判:dsh 桌面端的插件界面也在内嵌
@@ -553,8 +588,12 @@ pub fn run() {
                 .initialization_script_for_all_frames(format!(
                     "window.__DSH_TETHER_APP__ = {:?};",
                     env!("CARGO_PKG_VERSION")
-                ))
-                .build()?;
+                ));
+            // 安卓 WebView 存不了 blob: 下载,dsh 的下载全是 blob:;在 iframe 里截下来交给
+            // save_download。其余平台不注,保持 WebView 原行为
+            #[cfg(target_os = "android")]
+            let builder = builder.initialization_script_for_all_frames(include_str!("../download-bridge.js"));
+            builder.build()?;
             Ok(())
         })
         .run(tauri::generate_context!())

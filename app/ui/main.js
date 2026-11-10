@@ -478,6 +478,26 @@ el('open-hosts').addEventListener('click', () => { refreshHosts(); showView('hos
 let panelReady = false
 let lastRemoteState = { status: 'disconnected', detail: '' }
 
+/**
+ * iframe 里的下载桥(src-tauri/download-bridge.js)截下的文件:Blob 读成 base64
+ * 交给 Rust 存进系统「下载」,结果按 id 原路回给 iframe 显示提示。
+ */
+function saveDownload({ id, name, blob }) {
+  const reply = (ok, value) => forwardToFrame({ type: 'dsh-tether:save-download-result', id, ok, ...(ok ? { value } : { error: value }) })
+  if (!(blob instanceof Blob)) { reply(false, 'no data'); return }
+  const reader = new FileReader()
+  reader.onerror = () => reply(false, String(reader.error))
+  reader.onload = () => {
+    const url = String(reader.result)
+    const data = url.slice(url.indexOf(',') + 1)
+    invoke('save_download', { name: String(name || 'download'), mime: blob.type || '', data }).then(
+      (saved) => reply(true, { name: saved }),
+      (error) => reply(false, String(error)),
+    )
+  }
+  reader.readAsDataURL(blob)
+}
+
 function forwardToFrame(msg) {
   const frame = el('webui')
   if (webUiOrigin === null) return
@@ -493,6 +513,10 @@ window.addEventListener('message', (e) => {
       (value) => frame.contentWindow?.postMessage({ type: 'dsh-tether:invoke-result', id: d.id, ok: true, value }, webUiOrigin),
       (error) => frame.contentWindow?.postMessage({ type: 'dsh-tether:invoke-result', id: d.id, ok: false, error: String(error) }, webUiOrigin),
     )
+    return
+  }
+  if (d?.type === 'dsh-tether:save-download') {
+    saveDownload(d)
     return
   }
   if (d?.type === 'dsh-tether:panel-ready') {

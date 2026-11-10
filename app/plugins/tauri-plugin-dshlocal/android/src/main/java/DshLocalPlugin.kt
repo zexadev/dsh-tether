@@ -11,6 +11,7 @@ import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
+import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 
 @InvokeArg
@@ -25,6 +26,13 @@ class KeepAliveArgs {
   var text: String = ""
   /** 熄屏时也持有 CPU 唤醒锁;手机端页面的开关,默认关 */
   var wakeLock: Boolean = false
+}
+
+@InvokeArg
+class SaveDownloadArgs {
+  var path: String = ""
+  var name: String = ""
+  var mime: String = ""
 }
 
 /** Rust 侧经 run_mobile_plugin 调 startService / stopService;不暴露给 JS。 */
@@ -80,5 +88,20 @@ class DshLocalPlugin(private val activity: Activity) : Plugin(activity) {
   fun stopKeepAlive(invoke: Invoke) {
     activity.stopService(Intent(activity, DshKeepAliveService::class.java))
     invoke.resolve()
+  }
+
+  /** 下载桥截下的文件:Rust 已落到缓存临时文件,这里存进公共「下载」。拷贝可能
+   *  有几十 MB,不占主线程。 */
+  @Command
+  fun saveDownload(invoke: Invoke) {
+    val args = invoke.parseArgs(SaveDownloadArgs::class.java)
+    Thread {
+      try {
+        val name = DshDownloads.save(activity.applicationContext, java.io.File(args.path), args.name, args.mime)
+        invoke.resolve(JSObject().apply { put("name", name) })
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: e.toString())
+      }
+    }.start()
   }
 }

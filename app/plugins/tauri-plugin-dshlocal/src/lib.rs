@@ -27,6 +27,21 @@ struct KeepAliveArgs<'a> {
 }
 
 #[cfg(target_os = "android")]
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveDownloadArgs<'a> {
+    path: &'a str,
+    name: &'a str,
+    mime: &'a str,
+}
+
+#[cfg(target_os = "android")]
+#[derive(serde::Deserialize)]
+struct SavedDownload {
+    name: String,
+}
+
+#[cfg(target_os = "android")]
 pub struct DshLocal<R: Runtime>(PluginHandle<R>);
 
 #[cfg(target_os = "android")]
@@ -49,6 +64,13 @@ impl<R: Runtime> DshLocal<R> {
 
     pub fn stop_keep_alive(&self) -> tauri::Result<()> {
         self.0.run_mobile_plugin::<()>("stopKeepAlive", ()).map_err(Into::into)
+    }
+
+    pub fn save_download(&self, path: &str, name: &str, mime: &str) -> tauri::Result<String> {
+        self.0
+            .run_mobile_plugin::<SavedDownload>("saveDownload", SaveDownloadArgs { path, name, mime })
+            .map(|saved| saved.name)
+            .map_err(Into::into)
     }
 }
 
@@ -105,6 +127,21 @@ pub fn stop_keep_alive<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<(
     {
         let _ = app;
         Ok(())
+    }
+}
+
+/// 把 `path` 处的文件拷进系统公共「下载」目录(显示名 `name`,类型 `mime`)并发
+/// 完成通知,返回最终文件名(重名时系统会改名)。`path` 本身不动,调用方自己删。
+/// 非 Android 平台报不支持。
+pub fn save_download<R: Runtime>(app: &tauri::AppHandle<R>, path: &str, name: &str, mime: &str) -> tauri::Result<String> {
+    #[cfg(target_os = "android")]
+    {
+        return app.state::<DshLocal<R>>().save_download(path, name, mime);
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (app, path, name, mime);
+        Err(tauri::Error::Io(std::io::Error::new(std::io::ErrorKind::Unsupported, "save_download is Android-only")))
     }
 }
 
