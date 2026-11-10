@@ -268,6 +268,8 @@ function apply(ctx, config = {}) {
 
   const send = (msg) => { child.stdin.write(JSON.stringify(msg) + '\n') }
   let endpointId = ''
+  /** 当前有没有手机连着;喂给 systemPrompt 的动态上下文,让 agent 知道用户在小屏上 */
+  let phoneConnected = false
   /** 等着拿配对串的那个请求;sidecar 回 pairing 时兑现 */
   let pendingPairing
   /** 等着拿设备列表的那些请求;sidecar 回 devices 时一并兑现 */
@@ -303,6 +305,7 @@ function apply(ctx, config = {}) {
         console.log(`[tether] ${tt('配对成功: ', 'paired: ')}${msg.name}(${msg.peer.slice(0, 16)}…)`)
         break
       case 'peer-connected':
+        phoneConnected = true
         console.log(`[tether] ${tt('手机已连接: ', 'phone connected: ')}${msg.name}`)
         break
       case 'peer-path':
@@ -311,6 +314,7 @@ function apply(ctx, config = {}) {
           : tt('连接路径: relay 中转(打洞未成,可用但延迟略高) ', 'path: via relay (hole punch failed; works, slightly higher latency) ')}${msg.remote}`)
         break
       case 'peer-disconnected':
+        phoneConnected = false
         console.log(`[tether] ${tt('手机已断开', 'phone disconnected')}`)
         break
       case 'proxy-opened':
@@ -328,6 +332,26 @@ function apply(ctx, config = {}) {
   })
 
   applyUi(ctx)
+
+  // 让 agent 知道用户当前在手机上:dsh 每次模型请求前都会重算注册过的运行时
+  // 上下文,这里按手机连接状态动态给/不给一段「用户在小屏上」的事实,agent 就
+  // 会按小屏来组织回答(结论先行、段落短、少用宽表格)。手机断开后这段自动消失,
+  // 桌面会话不受任何影响。systemPrompt 是新版 dsh 的服务:旧版没有提供方,
+  // inject 的回调永远不触发,等于没有这段(能力判据,不做版本号判断)。
+  ctx.inject(['systemPrompt'], (spCtx) => {
+    spCtx.systemPrompt.context({
+      name: 'tether:phone-client',
+      order: 300,
+      required: false,
+      interpolate: false,
+      text: () => (phoneConnected
+        ? tt(
+          '用户当前正通过手机上的 DSH Tether 客户端使用。输出要适合手机小屏:结论先行、段落短、避免宽表格与多列并排,不要让关键信息藏在需要横向滚动才能看到的位置。',
+          'The user is currently on the phone through the DSH Tether client. Keep the output phone-friendly: lead with the answer, keep paragraphs short, avoid wide tables and side-by-side columns, and keep critical information out of anything that needs horizontal scrolling.',
+        )
+        : ''),
+    })
+  })
 
   // dsh 0.1.2-alpha 起浏览器界面要求认证:进程启动 token 经 GET /?token= 换成
   // HMAC 签名 cookie,index 与 /api 无 cookie 一律 401。cookie 是 SameSite=Strict
