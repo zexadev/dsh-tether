@@ -2,6 +2,34 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.29
+
+### 修复
+
+- **键盘弹出时输入框还是留在键盘底下**。0.1.28 给 MainActivity 加了 `windowSoftInputMode=adjustResize`,但 App 在所有系统版本上都开了「边到边」布局(`enableEdgeToEdge()`),这种布局下 adjustResize 不再压缩窗口(Android 11 起如此,Android 15 起更是强制边到边),键盘直接盖住 WebView。现在插件把键盘高度转成内容区底部留白,WebView 随之变矮,输入框跟着键盘上移;不分系统版本。
+
+- **手机上点文件/附件/图片的「下载」没有任何反应**。dsh 的下载全部是浏览器内存里的 `blob:` 地址,安卓 WebView 不会保存这种下载,系统下载器也只认 http/https。现在 App 在 dsh 界面里截下这类下载,把文件交给 App 存进手机的「下载」目录:页面底部提示「已保存到「下载」」,通知栏有完成通知,点开即用系统应用打开。Android 10 及以上不需要任何存储权限;Android 7–9 存在 App 专属的下载目录里,系统「下载」应用里可见,卸载 App 时会一并删除。单个文件上限 50 MB,更大的请在电脑上下载。这个修复在 App 里,不依赖电脑端插件版本,本地模式同样生效。
+
+- **手机连接状态在重连时会误判为已断开**。电脑端插件原来用一个开关记「有没有手机连着」,同一台手机重连时旧连接收尾晚到,会把刚连上的状态清掉;两台手机同时连着断开一台也会清掉。现在按连接计数。
+
+### 新增
+
+- **「熄屏时保持连接」开关(仅安卓)**。保活前台服务只能防止 App 被系统杀掉或冻结,挡不住熄屏后手机 CPU 进入深度休眠——休眠久了连接心跳发不出去,连接照样会断。主机页新增这个开关,打开后连着电脑退到后台时会让 CPU 保持运行(屏幕照常关闭),熄屏很久也不断线;会更耗电,默认关闭,下次退到后台时生效。
+
+- **agent 知道你在用手机**。在手机上发消息的会话里,电脑端插件经 dsh 的运行时上下文告诉 agent「用户正在手机上使用」,agent 会按小屏组织回答:结论先行、段落短、避免宽表格与多列并排。只作用于最后一条消息从手机发出的会话:手机连着时电脑上同时开着的会话不受影响,回到电脑在同一会话里发消息就恢复原来的写法;手机断开后这段消失。没有该能力的旧版 dsh 自动跳过。
+
+### English
+
+The composer still stayed under the keyboard. 0.1.28 set `windowSoftInputMode=adjustResize`, but the app enables edge-to-edge layout (`enableEdgeToEdge()`) on every Android version, and under edge-to-edge adjustResize no longer shrinks the window (from Android 11, and edge-to-edge is enforced from Android 15), so the keyboard simply covered the WebView. The plugin now turns the keyboard height into bottom padding on the content view, so the WebView shrinks and the composer rises with the keyboard, on every Android version.
+
+Tapping "Download" on a file, attachment or image did nothing on the phone. Every dsh download is an in-memory `blob:` URL, which the Android WebView does not save and the system download manager cannot fetch (it only takes http/https). The app now intercepts these downloads inside the dsh page and saves the file to the phone's Downloads folder, with an in-page "Saved to Downloads" note and a completion notification that opens the file in the system app. Android 10+ needs no storage permission; on Android 7–9 files go to the app's own download folder, visible in the system Downloads app and removed when the app is uninstalled. Files are capped at 50 MB; download larger ones on the computer. The fix lives in the app, so it works with any desktop plugin version and in local mode.
+
+The desktop plugin could think the phone had disconnected when it reconnected. It tracked "is a phone connected" as a single flag, so a late teardown of the old connection cleared the state of the new one, and with two phones connected, disconnecting one cleared it too. It now counts connections.
+
+New "Stay connected with the screen off" switch (Android only). The keep-alive foreground service stops the system from killing or freezing the app, but not from putting the CPU into deep sleep once the screen is off; after a while the connection's heartbeats stop and it drops anyway. With the switch on, the CPU keeps running (the screen still turns off) while the app is in the background and connected, so long screen-off periods no longer drop the connection. It uses more battery, is off by default, and takes effect the next time the app goes to the background.
+
+The agent now knows you are on the phone. In sessions where you send messages from the phone, the desktop plugin tells the agent through dsh's runtime context that the user is on a phone, and the agent shapes its answers for a small screen: the answer first, short paragraphs, no wide tables or side-by-side columns. It applies only to sessions whose latest message came from the phone: sessions open on the computer at the same time are unaffected, sending a message from the computer in the same session switches back, and the note disappears when the phone disconnects. Older dsh builds without this capability skip it.
+
 ## 0.1.28
 
 ### 修复
