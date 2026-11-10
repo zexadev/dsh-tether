@@ -105,6 +105,49 @@ input {
   outline: none;
 }
 input:focus { border-color: var(--border); }
+
+/* 设置开关:一行文字 + 右侧拨动开关,文字可点 */
+.setting { margin-top: 22px; }
+.setting .hint { margin-top: 6px; }
+label.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+label.toggle input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 40px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: var(--fill);
+  transition: background 0.15s;
+  cursor: pointer;
+}
+label.toggle input::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s;
+}
+label.toggle input:checked { background: var(--ok); }
+label.toggle input:checked::after { transform: translateX(16px); }
 input::placeholder { color: var(--muted); }
 
 /* dsh 的按钮语汇:主操作=浅填充块,次操作=描边,都是深色文字、400 字重 */

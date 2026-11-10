@@ -292,8 +292,21 @@ function startKeepAlive() {
   invoke('keep_alive_start', {
     title: name ? t('status.connectedTo', { name }) : t('status.connected'),
     text: t('keepAlive.text'),
+    wakeLock: wakeLockEnabled(),
   }).catch(() => {})
 }
+
+// 「熄屏时保持连接」开关:保活服务期间是否另持 CPU 唤醒锁。只是本机偏好,
+// 存 localStorage;读不到(隐私模式、被清)就按默认关处理。
+const WAKE_LOCK_KEY = 'dsh-tether:wakeLock'
+
+function wakeLockEnabled() {
+  try { return localStorage.getItem(WAKE_LOCK_KEY) === '1' } catch { return false }
+}
+
+el('wakelock-toggle').addEventListener('change', (e) => {
+  try { localStorage.setItem(WAKE_LOCK_KEY, e.target.checked ? '1' : '0') } catch {}
+})
 
 function stopKeepAlive() {
   invoke('keep_alive_stop').catch(() => {})
@@ -599,7 +612,11 @@ async function boot() {
     .catch(() => {})
   await refreshHosts()
   // 电池白名单提示只在安卓有意义:保活前台服务是安卓机制,iOS 没有可设的项
-  if (/Android/i.test(navigator.userAgent)) el('battery-hint').classList.remove('hidden')
+  if (/Android/i.test(navigator.userAgent)) {
+    el('battery-hint').classList.remove('hidden')
+    el('wakelock-toggle').checked = wakeLockEnabled()
+    el('wakelock-setting').classList.remove('hidden')
+  }
   let lastMode = null
   try { lastMode = localStorage.getItem(LAST_MODE_KEY) } catch {}
   const localAvailable = !el('local-card').classList.contains('hidden')

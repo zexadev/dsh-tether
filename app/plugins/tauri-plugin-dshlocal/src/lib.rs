@@ -18,6 +18,15 @@ struct ServiceArgs<'a> {
 }
 
 #[cfg(target_os = "android")]
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct KeepAliveArgs<'a> {
+    title: &'a str,
+    text: &'a str,
+    wake_lock: bool,
+}
+
+#[cfg(target_os = "android")]
 pub struct DshLocal<R: Runtime>(PluginHandle<R>);
 
 #[cfg(target_os = "android")]
@@ -32,9 +41,9 @@ impl<R: Runtime> DshLocal<R> {
         self.0.run_mobile_plugin::<()>("stopService", ()).map_err(Into::into)
     }
 
-    pub fn start_keep_alive(&self, title: &str, text: &str) -> tauri::Result<()> {
+    pub fn start_keep_alive(&self, title: &str, text: &str, wake_lock: bool) -> tauri::Result<()> {
         self.0
-            .run_mobile_plugin::<()>("startKeepAlive", ServiceArgs { title, text })
+            .run_mobile_plugin::<()>("startKeepAlive", KeepAliveArgs { title, text, wake_lock })
             .map_err(Into::into)
     }
 
@@ -68,15 +77,21 @@ pub fn stop_service<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> 
     }
 }
 
-/// 起远程连接的后台保活前台服务(带静默常驻通知)。非 Android 平台无事发生。
-pub fn start_keep_alive<R: Runtime>(app: &tauri::AppHandle<R>, title: &str, text: &str) -> tauri::Result<()> {
+/// 起远程连接的后台保活前台服务(带静默常驻通知)。`wake_lock` 为真时服务期间
+/// 另持 CPU 唤醒锁,熄屏深度休眠也不停。非 Android 平台无事发生。
+pub fn start_keep_alive<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    title: &str,
+    text: &str,
+    wake_lock: bool,
+) -> tauri::Result<()> {
     #[cfg(target_os = "android")]
     {
-        return app.state::<DshLocal<R>>().start_keep_alive(title, text);
+        return app.state::<DshLocal<R>>().start_keep_alive(title, text, wake_lock);
     }
     #[cfg(not(target_os = "android"))]
     {
-        let _ = (app, title, text);
+        let _ = (app, title, text, wake_lock);
         Ok(())
     }
 }

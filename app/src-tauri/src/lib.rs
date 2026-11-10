@@ -466,8 +466,8 @@ async fn local_stop(app: AppHandle) {
 /// 远程连接的后台保活:退到后台时前端调用,挂一条静默常驻通知让系统把进程
 /// 当前台进程,iroh 连接才不会因为 Doze / 缓存冻结而断。非 Android 无事发生。
 #[tauri::command]
-fn keep_alive_start(app: AppHandle, title: String, text: String) {
-    let _ = tauri_plugin_dshlocal::start_keep_alive(&app, &title, &text);
+fn keep_alive_start(app: AppHandle, title: String, text: String, wake_lock: Option<bool>) {
+    let _ = tauri_plugin_dshlocal::start_keep_alive(&app, &title, &text, wake_lock.unwrap_or(false));
 }
 
 #[tauri::command]

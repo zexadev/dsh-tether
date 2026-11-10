@@ -19,6 +19,14 @@ class ServiceArgs {
   var text: String = ""
 }
 
+@InvokeArg
+class KeepAliveArgs {
+  var title: String = "DSH Tether"
+  var text: String = ""
+  /** 熄屏时也持有 CPU 唤醒锁;手机端页面的开关,默认关 */
+  var wakeLock: Boolean = false
+}
+
 /** Rust 侧经 run_mobile_plugin 调 startService / stopService;不暴露给 JS。 */
 @TauriPlugin
 class DshLocalPlugin(private val activity: Activity) : Plugin(activity) {
@@ -59,10 +67,11 @@ class DshLocalPlugin(private val activity: Activity) : Plugin(activity) {
 
   @Command
   fun startKeepAlive(invoke: Invoke) {
-    val args = invoke.parseArgs(ServiceArgs::class.java)
+    val args = invoke.parseArgs(KeepAliveArgs::class.java)
     val intent = Intent(activity, DshKeepAliveService::class.java)
       .putExtra(DshKeepAliveService.EXTRA_TITLE, args.title)
       .putExtra(DshKeepAliveService.EXTRA_TEXT, args.text)
+      .putExtra(DshKeepAliveService.EXTRA_WAKE_LOCK, args.wakeLock)
     ContextCompat.startForegroundService(activity, intent)
     invoke.resolve()
   }

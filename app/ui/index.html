@@ -36,6 +36,14 @@
     <p id="hosts-error" class="error hidden"></p>
     <button id="add-host" class="btn btn-block" data-i18n="hosts.add"></button>
     <button id="hosts-back" class="btn btn-quiet btn-block" data-i18n="hosts.back"></button>
+    <!-- 安卓专属:远程连接退后台时额外持 CPU 唤醒锁,熄屏也不断;更耗电,默认关 -->
+    <div id="wakelock-setting" class="setting hidden">
+      <label class="toggle">
+        <span data-i18n="settings.wakeLock"></span>
+        <input id="wakelock-toggle" type="checkbox" role="switch" />
+      </label>
+      <p class="hint" data-i18n="settings.wakeLockHint"></p>
+    </div>
     <p id="battery-hint" class="hint hidden" data-i18n="hosts.batteryHint"></p>
     <footer class="about">
       <span id="about-version">DSH Tether</span>

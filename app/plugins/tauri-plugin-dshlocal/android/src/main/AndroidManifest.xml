@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 远程保活可选的 CPU 唤醒锁(手机端页面开关,默认关);普通权限,安装即授予 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application>
         <service

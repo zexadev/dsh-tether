@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 
 /**
  * 远程连接的后台保活前台服务:App 退到后台时起,回前台即停。它存在的意义与
@@ -21,9 +22,20 @@ class DshKeepAliveService : Service() {
   companion object {
     const val EXTRA_TITLE = "title"
     const val EXTRA_TEXT = "text"
+    const val EXTRA_WAKE_LOCK = "wakeLock"
     private const val CHANNEL_ID = "dsh-keepalive"
     private const val NOTIFICATION_ID = 0x0d5c
+    private const val WAKE_LOCK_TAG = "dshtether:keepalive"
   }
+
+  /**
+   * 前台服务只保证进程不被杀、不被冻结,不阻止 CPU 休眠:熄屏进入深度休眠后
+   * 定时器不走,QUIC keepalive 发不出去,NAT 映射过期或对端判空闲超时,连接就断。
+   * 持有 PARTIAL_WAKE_LOCK 让 CPU 保持运行(屏幕照样关),代价是耗电,所以做成
+   * 手机端页面的开关、默认关。只在本服务存活期间持有:onDestroy 释放,进程被杀
+   * 时系统也会收回。
+   */
+  private var wakeLock: PowerManager.WakeLock? = null
 
   override fun onBind(intent: Intent?): IBinder? = null
 
@@ -37,12 +49,31 @@ class DshKeepAliveService : Service() {
     } else {
       startForeground(NOTIFICATION_ID, notification)
     }
+    // 每次启动都按本次开关对齐:开关可能在两次退后台之间被改过
+    if (intent?.getBooleanExtra(EXTRA_WAKE_LOCK, false) == true) acquireWakeLock() else releaseWakeLock()
     return START_NOT_STICKY
   }
 
   override fun onDestroy() {
+    releaseWakeLock()
     stopForeground(STOP_FOREGROUND_REMOVE)
     super.onDestroy()
+  }
+
+  // 不设超时:锁的寿命就是服务的寿命,回前台 stopService 时在 onDestroy 释放
+  @Suppress("WakelockTimeout")
+  private fun acquireWakeLock() {
+    if (wakeLock?.isHeld == true) return
+    val pm = getSystemService(POWER_SERVICE) as PowerManager
+    wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG).apply {
+      setReferenceCounted(false)
+      acquire()
+    }
+  }
+
+  private fun releaseWakeLock() {
+    wakeLock?.let { if (it.isHeld) it.release() }
+    wakeLock = null
   }
 
   private fun ensureChannel() {
