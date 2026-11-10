@@ -47,6 +47,8 @@ const CONFIG_DOCUMENT_PATH = '/dsh-tether/config-document'
 /** 按需开一个配对窗口,拿回配对串 */
 const PAIRING_PATH = '/dsh-tether/pairing'
 const DEVICES_PATH = '/dsh-tether/devices'
+/** 注入脚本报「这条消息从手机还是电脑发出」,按会话决定要不要告诉 agent 用户在小屏上 */
+const PROMPT_ORIGIN_PATH = '/dsh-tether/prompt-origin'
 
 /** dsh 的回环判定:localhost、IPv6 回环、以及整个 127/8 */
 function isLoopbackHostname(hostname) {
@@ -340,18 +342,56 @@ function apply(ctx, config = {}) {
 
   applyUi(ctx)
 
+  // 会话 → 最后一条消息是从哪端发的('phone' | 'desktop')。dsh 服务端分不出请求
+  // 来自哪个浏览器(所有已认证浏览器共用一个 peer,prompt 记录里也没有来源),只有
+  // 发送端自己知道:注入脚本在发 session/prompt 之前先报到这条路由。带 App 标记的
+  // 是手机,其余(电脑浏览器、dsh 桌面端)是电脑。按「最后发送者」而不是「手机用
+  // 过」:同一会话在手机上聊过、回到电脑接着聊,就该恢复成电脑的写法。
+  const sessionOrigins = new Map()
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: PROMPT_ORIGIN_PATH,
+    handler: async (req, res) => {
+      if (!isTrustedRequest(req) || req.method !== 'POST') return refuse(res)
+      const chunks = []
+      let size = 0
+      for await (const chunk of req) {
+        size += chunk.length
+        if (size > 4096) return refuse(res)
+        chunks.push(chunk)
+      }
+      let body
+      try {
+        body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+      } catch {
+        body = undefined
+      }
+      const sessionId = body?.sessionId
+      if (typeof sessionId === 'string' && sessionId !== '' && sessionId.length <= 256) {
+        // 删了再放:Map 按插入序,最早的就是最久没人发过消息的,超量从头淘汰
+        sessionOrigins.delete(sessionId)
+        sessionOrigins.set(sessionId, body.phone === true ? 'phone' : 'desktop')
+        while (sessionOrigins.size > 500) sessionOrigins.delete(sessionOrigins.keys().next().value)
+      }
+      res.writeHead(204)
+      res.end()
+    },
+  }))
+
   // 让 agent 知道用户当前在手机上:dsh 每次模型请求前都会重算注册过的运行时
-  // 上下文,这里按手机连接状态动态给/不给一段「用户在小屏上」的事实,agent 就
-  // 会按小屏来组织回答(结论先行、段落短、少用宽表格)。手机断开后这段自动消失,
-  // 桌面会话不受任何影响。systemPrompt 是新版 dsh 的服务:旧版没有提供方,
-  // inject 的回调永远不触发,等于没有这段(能力判据,不做版本号判断)。
+  // 上下文(text 收到的 context.agent.session 就是当前会话),这里只在「手机连着、
+  // 且这个会话的最后一条消息是从手机发的」时给一段「用户在小屏上」的事实,agent
+  // 就会按小屏来组织回答(结论先行、段落短、少用宽表格)。同时开着的电脑会话不受
+  // 影响;手机断开,或回到电脑上在这个会话里发消息,这段就消失。systemPrompt 是
+  // 新版 dsh 的服务:旧版没有提供方,inject 的回调永远不触发,等于没有这段(能力
+  // 判据,不做版本号判断)。
   ctx.inject(['systemPrompt'], (spCtx) => {
     spCtx.systemPrompt.context({
       name: 'tether:phone-client',
       order: 300,
       required: false,
       interpolate: false,
-      text: () => (phoneConnections > 0
+      text: (context) => (phoneConnections > 0 && sessionOrigins.get(context?.agent?.session?.id) === 'phone'
         ? tt(
           '用户当前正通过手机上的 DSH Tether 客户端使用。输出要适合手机小屏:结论先行、段落短、避免宽表格与多列并排,不要让关键信息藏在需要横向滚动才能看到的位置。',
           'The user is currently on the phone through the DSH Tether client. Keep the output phone-friendly: lead with the answer, keep paragraphs short, avoid wide tables and side-by-side columns, and keep critical information out of anything that needs horizontal scrolling.',
@@ -680,6 +720,47 @@ const tetherScript = `
   function zhUi() { return /^zh/i.test(document.documentElement.lang || '') }
   function tx(zh, en) { return zhUi() ? zh : en }
   function langHeaders() { return { 'x-dsh-tether-lang': zhUi() ? 'zh' : 'en' } }
+
+  // 发消息前先报「这条从手机还是电脑发出」(按会话)。dsh 服务端分不出请求来自哪个
+  // 浏览器,只有发送端自己知道;电脑端插件据此只在手机正用着的会话里告诉 agent
+  // 用户在小屏上。dsh 的一元 RPC 每次调用都现取 globalThis.fetch,包在这里即可;
+  // 先等上报落地(最多 1.5 秒)再发原请求,保证 agent 组装上下文时已经知道来源。
+  // 上报失败或超时都照常发消息,不拦用户。
+  ;(function () {
+    var nativeFetch = window.fetch
+    if (typeof nativeFetch !== 'function') return
+    var fromApp = !!window.__DSH_TETHER_APP__
+    var PROMPT_SUFFIX = 'api/session/prompt'
+    function findSessionId(value, depth) {
+      if (!value || typeof value !== 'object' || depth > 6) return null
+      if (typeof value.sessionId === 'string' && value.sessionId) return value.sessionId
+      for (var key in value) {
+        var found = findSessionId(value[key], depth + 1)
+        if (found) return found
+      }
+      return null
+    }
+    window.fetch = function (input, init) {
+      var args = arguments
+      var sessionId = null
+      try {
+        var url = typeof input === 'string' ? input : (input && input.url) || ''
+        var path = url.split('?')[0]
+        if (path.slice(-PROMPT_SUFFIX.length) === PROMPT_SUFFIX && init && typeof init.body === 'string') {
+          sessionId = findSessionId(JSON.parse(init.body), 0)
+        }
+      } catch (e) {}
+      if (!sessionId) return nativeFetch.apply(window, args)
+      var report = nativeFetch.call(window, '${PROMPT_ORIGIN_PATH}', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: sessionId, phone: fromApp }),
+      }).catch(function () {})
+      var timeout = new Promise(function (resolve) { setTimeout(resolve, 1500) })
+      return Promise.race([report, timeout]).then(function () { return nativeFetch.apply(window, args) })
+    }
+  })()
+
   document.addEventListener('pointerdown', function (event) {
     if (!narrow.matches) return
     var frame = document.querySelector('[class*="_frame"]')
