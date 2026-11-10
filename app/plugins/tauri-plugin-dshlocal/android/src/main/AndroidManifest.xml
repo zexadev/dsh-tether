@@ -15,5 +15,13 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keeps the locally running DeepSeek Harness server alive while the app is in the background" />
         </service>
+        <service
+            android:name="cc.zexa.dshtether.dshlocal.DshKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the P2P connection to the paired computer alive while the app is in the background" />
+        </service>
     </application>
 </manifest>

@@ -2,6 +2,66 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.28
+
+### 修复
+
+- **手机上的弹窗全是直角方块,文字还互相重叠**。0.1.0 起注入的窄屏样式把所有 `[role=dialog]` 一律改铺满全屏并压成直角(`border-radius:0`),那段规则本来只服务旧版 dsh 的「设置」大弹窗(800px 宽 + 188px 固定左导航,手机上放不下),却被后来的每个弹窗继承:登录、预览版说明、确认框本来是 dsh 自己的居中圆角卡片(380px 宽、28px 圆角),全被压成直角满屏;旧版设置壳的头部还被绝对定位钉到右上角,盖在内容文字上。现在弹窗样式只认「设置壳」本身(带左侧导航、`nav` 里套着 `navList` 的 modal 对话框),别的弹窗一律不碰,恢复 dsh 原生的圆角卡片;设置壳统一收成 dsh 自己的圆角卡片(`--dsw-radius-panel`,与桌面一致),四周留 12px 边距。0.2.2-rc.1 起 dsh 自带 ≤767px 的窄屏布局(标题+关闭 / 标签 / 内容 三行网格),这版式本来就是对的,不再去改它的 display——旧版壳按「nav 是第一个孩子」这个结构特征做竖排(标签横排在上、内容占满下面),头部回到流内,不再钉右上角。0.2.2-rc 的原生侧栏抽屉也是 `[role=dialog]`,但它 nav 里没有 `navList`,上面的规则不会误伤它——此前它被「直接 div 全部 flex:1」那条撑歪过。412×915 实量:预览版说明、登录弹窗回到原生 28px 圆角居中卡片,设置壳 388×891 圆角卡片、标题与关闭键同行不重叠、标签横排可滚动、各设置页内容全部收在视口内。
+
+- **会话内容在手机上会把页面撑宽**。agent 输出的宽表格、长代码块、大图都可能比手机宽;现在针对会话滚动容器(`[data-conversation-scroll]`,dsh 自己标的属性)加了自适应兜底:图片/视频/画布收进视口宽,表格与代码块封顶 100%、在自己盒子里横向滚动,长到没法折行的原文(路径、命令、哈希)按词折行。界面自己的图标、控件不受影响。
+
+- **手机上输入法弹出时,dsh 的输入框不上移,键盘把输入框盖住**。App 的 Android 清单没写 `windowSoftInputMode`,系统按默认策略处理;而 dsh 的输入框是 iframe 里的 contenteditable,系统的「自动平移」逻辑根本找不到它,键盘就直接盖上去。现在给 MainActivity 显式设 `adjustResize`:键盘弹出时 WebView 视口收缩,dsh 界面跟着上移,输入框保持在键盘上方。
+
+- **App 退到后台时间久了,与电脑的连接就会断**。Android 会把后台进程缓存冻结(Doze),iroh 连接没有前台身份就活不下来。现在远程连接建立后,App 退到后台时自动挂一条保活前台服务(低优先级静默常驻通知,写明连着哪台电脑),系统就不冻进程、不断网;回到前台即撤掉。若后台期间连接仍掉了(电脑休眠、网络切换等),就地自动重连一次,再失败就收手,回前台照旧重连。本地模式已有自己的常驻服务,不受影响。
+
+- **连上远程电脑后,常驻通知「本机 DSH 运行中」让人以为手机还连在本机**。本机 DSH 不会因连远程而关闭——这是有意保留的（切回本机免重启），但之前界面上没说明。现在主机页的本机卡片在运行时会写明「连接其它电脑后它也会继续在后台运行」，连接其它电脑时状态页也会提示「本机 DSH 仍在后台运行，连接电脑不会停掉它」；想停随时回主机页按「停止本机 DSH」。
+
+- **安卓上一打开 App 就崩溃(点「连接」即退)**。iroh 1.0 引入的 reqwest 0.13 以 `rustls-no-provider` 构建,而 App 从没安装过 rustls 全局 crypto provider:自动重连第一次建 iroh 端点时,reqwest 建第一个 HTTP 客户端就直接 panic("No rustls crypto provider is configured"),进程 SIGABRT——0.1.27 的 APK 在 Android 16 真机上实测必现。现在 App 启动时安装 ring provider(与 iroh 默认 tls-ring 同一后端,零额外链接成本),真机配对、连接、代理浏览全部跑通。
+
+- **安卓上首次使用不弹通知授权,通知被系统静默丢弃**。App 原来用 JS 的 `Notification.requestPermission()` 请求权限,而 Android WebView 里这个 API 永远返回 granted——系统权限其实没给,所有通知被系统按「禁止通知」静默丢掉,用户还得自己去设置里开。现在改走插件 Kotlin 侧的原生请求:Android 13+ 首次进入即弹系统半屏授权框(「允许 DSH Tether 发送通知?」),13 以下无此权限、恒为已授权。真机验证:清数据后首启必弹框,点「始终允许」后 POST_NOTIFICATIONS 正常授予。
+
+### 变更
+
+- **连接电脑时用 dsh 自己的加载界面,不再放 App 自制的加载页**。原来连接时手机显示 App 自己的「正在打开电脑上的 DeepSeek Harness…」;现在连接阶段的文字就是「正在连接至电脑」,并且 dsh 界面里的加载文字「正在加载工作区…」在连接阶段也改写成「正在连接至电脑」(英文对应 `Connecting to the computer`)。App 连上后向 web UI 发一条 `dsh-tether:connected`,注入脚本收到即停,之后的加载文字恢复 dsh 原文;桌面浏览器和 dsh 桌面端没有 App 标记,这段完全不生效。
+
+- **侧栏「连接手机」按钮在电脑端打开的不再是单页配对串查看页,而是完整的功能页**。三段:配对新手机(配对串 + 复制 + 有效期倒计时 + 重新获取)、已配对设备(名称、在线状态、两步确认移除,与原来一致)、使用说明(安装 App → 粘贴配对串 → 远程使用)。窄屏铺满、宽屏居中卡片,与原来同套视觉。手机 App 里这个按钮仍打开 App 自己的主机页,不变。
+
+- **主机页新增电池白名单提示(仅安卓)**。部分国产系统会强杀后台应用,保活前台服务也扛不住;现在主机页上写明「若退到后台后连接仍会断开,请在系统设置的电池/省电策略里把本应用设为不限制」,让用户自己动手,不做自动申请豁免的弹窗。
+
+- **手机 App 增加「关于与致谢」页与检查更新**。主机页的「返回」按钮此前只有连接还活着时才显示,断开后打开主机页只能点设备重连,现在任何时候都在(没连着时退回状态页/重连入口)。页脚版本号与「关于与致谢」进入新页面:明显的 GitHub 按钮、检查更新(对照 GitHub 最新 Release,有新版本时按钮变「前往下载」并提示版本号)、致谢。外链一律交给系统浏览器打开,不占用 App 界面。
+
+- **手机上的「我的电脑」长进了 dsh 界面里,不再整页切走**。此前点侧栏按钮会把整个界面交给 App 外壳,割裂感强;现在注入脚本在 dsh 界面内部做「会话 / 我的电脑」两栏 tab:主机列表(连接/改名/两步删除)、配对表单、本机卡片、连接状态与重连、关于与致谢,全部用 dsh 自己的主题变量渲染,主题语言都跟 dsh 走。数据与动作经 postMessage 桥走 App 的 Rust(带 15 秒超时),连接/本机状态事件由 App 实时转发进面板;顶栏「主机」按钮按能力路由——新插件开面板,旧插件仍回退 App 自己的主机页。
+
+- **保活通知升级成 Android 16 的「Live Update」胶囊(安卓版灵动岛)**。退到后台时那条保活常驻通知现在带系统计时(chronometer,从连接时刻起自己走秒)和 Android 16 的 `ProgressStyle`(不定进度)——在 Android 16 的状态栏显示成实时胶囊,锁屏与常显屏同样渲染;点开通知栏则是计时的钟。Android 15 及以下仍是普通常驻通知,不受影响。真机(Xiaomi 23113RKC6C / Android 16)验证:dumpsys 确认 `ProgressStyle` + `showChronometer` 已挂上。
+
+### English
+
+Dialogs on the phone were all square-cornered blocks with text overlapping. Since 0.1.0 the injected narrow-screen styles forced every `[role=dialog]` full-screen with `border-radius:0` — that rule only ever existed for the old dsh settings shell (800px wide with a fixed 188px left nav, unusable on a phone), but every dialog that came later inherited it: sign-in, the preview notice and confirmations are natively centred rounded cards (380px wide, 28px radius) and were all flattened into square full-screen blocks, and on the old shell the header was additionally pinned absolute to the top-right corner, covering the content text. The dialog rules now only match the settings shell itself (the modal whose `nav` contains a `navList`); every other dialog is left alone and keeps dsh's native rounded card, and the shell becomes dsh's own rounded card (`--dsw-radius-panel`, matching the desktop) with 12px margins. Since 0.2.2-rc.1 dsh ships its own ≤767px layout for the shell (title+close / tabs / content in three grid rows), which is already correct, its display is no longer touched — older shells are detected by the structural fact that their `nav` is the first child, reflowed to tabs-on-top with content below, and their header stays in flow instead of being pinned over the tabs. The native drawer in 0.2.2-rc is also a `[role=dialog]`, but its nav has no `navList`, so these rules never touch it — previously the blanket "every direct div is flex:1" rule had distorted it. Measured at 412×915: the preview notice and sign-in dialog are back to native 28px rounded centred cards, the settings shell is a 388×891 rounded card with the title and close button on one row without overlap, horizontally scrollable tabs, and every settings page fits inside the viewport.
+
+Conversation content could push the page wider than the phone: wide tables, long code blocks and large images from agent output. The conversation scroller (`[data-conversation-scroll]`, an attribute dsh itself sets) now gets adaptive fallbacks: images/videos/canvases are capped to the viewport width, tables and code blocks are capped at 100% and scroll inside their own boxes, and unbreakable prose (paths, commands, hashes) wraps at word boundaries. Chrome icons and controls are untouched.
+
+On a phone the dsh composer stopped rising when the keyboard opened, so the keyboard covered it. The app's Android manifest did not set `windowSoftInputMode`, leaving the system's default policy in charge, and since the dsh composer is a contenteditable inside an iframe the system's auto-pan logic cannot find it — the keyboard just covered it. The MainActivity now sets `adjustResize` explicitly: the WebView viewport shrinks while the keyboard is up, the dsh interface follows, and the composer stays above the keyboard.
+
+The connection to the computer dropped after the app sat in the background for a while. Android freezes cached background processes (Doze), and the iroh connection has no chance without a foreground identity. Once a remote connection is established, going to the background now starts a keep-alive foreground service — a silent, low-importance ongoing notification naming the connected computer — so the system neither freezes the process nor cuts its network; it is removed again on returning to the foreground. If the connection still drops while backgrounded (the computer slept, the network switched, …), the app retries once on the spot, gives up if that fails too, and reconnects as usual when brought back to the foreground. Local mode keeps its own existing service, unaffected.
+
+After connecting to a remote computer, the ongoing "DSH running on this phone" notification made it look like the phone was still on the local instance. The local DSH does not stop when you connect elsewhere — that is deliberate (switching back needs no restart), but the interface never said so. The hosts page's local card now explains, while running, that it keeps running in the background after you connect to another computer, and the status page adds "the DSH on this phone keeps running in the background — connecting to a computer does not stop it" while connecting. Stop it anytime from the hosts page.
+
+On Android the app crashed the moment it connected. iroh 1.0 pulls in reqwest 0.13 built with `rustls-no-provider`, and the app never installed a global rustls crypto provider: on the first automatic reconnect the endpoint setup builds its first plain reqwest client and panics ("No rustls crypto provider is configured"), aborting the process — reproduced on a real Android 16 device with the 0.1.27 APK. The app now installs the ring provider at startup (the same backend as iroh's default tls-ring, so nothing extra is linked); pairing, connecting and browsing through the proxy all verified on the device.
+
+On Android the first run never asked for notification permission, and every notification was silently dropped. The app used JS `Notification.requestPermission()`, which in the Android WebView always reports "granted" while the real system permission was never given, so all notifications were discarded as if notifications were disabled — and the user had to go find the setting themselves. The app now requests through the plugin's native Kotlin path: on Android 13+ the first launch shows the system half-screen dialog ("Allow DSH Tether to send notifications?"); below 13 there is no such permission and it is always granted. Verified on a real device: after clearing app data, the first launch shows the dialog, and tapping "Always allow" grants POST_NOTIFICATIONS.
+
+Connecting to a computer now uses dsh's own loading interface instead of the app's home-made loading page. The app's connecting text used to read "Opening the DeepSeek Harness on your computer…"; it now reads "正在连接至电脑" ("Connecting to the computer"), and while the connection is being established the injected script rewrites dsh's own loading text "正在加载工作区…" / "Loading workspaces…" to the same. Once connected, the app posts `dsh-tether:connected` to the web UI and the script stops rewriting, so later loading text is dsh's original again. Desktop browsers and the dsh desktop app carry no app marker, so this never runs there.
+
+The sidebar's "Connect a phone" button no longer opens the single-purpose pairing-string viewer on the computer; it now opens a full feature page with three sections: pair a new phone (pairing string with copy, a live validity countdown and a refresh button), paired devices (name, online status, two-step removal — as before), and a short how-to (install the app → paste the pairing string → use dsh remotely). It fills the screen when narrow and is a centred card when wide, in the same visual language as before. Inside the phone app the same button still opens the app's own machines page, unchanged.
+
+The hosts page gains a battery-whitelist note (Android only). Some OEM systems kill background apps aggressively enough that even the keep-alive foreground service cannot help; the hosts page now says "if the connection still drops in the background, set this app to Unrestricted under the system battery settings", leaving that one tap to the user instead of popping an automatic exemption request.
+
+The phone app gains an "About & thanks" page and an update check. The hosts page's "Back" button used to appear only while a session was live, so after a disconnect the hosts page had no way out except tapping a device to reconnect — it is now always present (leading back to the status page and its reconnect entry when nothing is live). The footer version and an "About & thanks" entry open a new page with a prominent GitHub button, an update check (compared against the latest GitHub release; when a newer version exists the button turns into "Download" and the version is shown), and the acknowledgements. External links always open in the system browser and never replace the app's own interface.
+
+"My computers" on the phone now lives inside the dsh interface instead of taking over the whole screen. Tapping the sidebar button used to hand the entire UI over to the app shell, which felt jarring; the injected script now switches a two-tab "Chat / My computers" strip inside dsh itself: the host list (connect / rename / two-step removal), the pairing form, the local-mode card, connection status and reconnect, and the about-and-thanks section, all rendered with dsh's own theme variables and following dsh's language and theme. Data and actions travel over a postMessage bridge to the app's Rust core (with a 15-second timeout), and connection/local-mode state events are relayed into the panel in real time. The top bar's "Machines" button routes by capability: the new plugin opens the panel, an older plugin still falls back to the app's own hosts page.
+
+The keep-alive notification is now an Android 16 "Live Update" chip — Android's Dynamic Island. The silent ongoing notification shown while connected in the background now carries a system chronometer (ticking from the moment the connection started) and Android 16's `ProgressStyle` with indeterminate progress: on Android 16 it appears as a live chip in the status bar and renders on the lock screen and always-on display, and in the shade it expands into a ticking timer. Android 15 and below keep the plain ongoing notification, unaffected. Verified on a real device (Xiaomi 23113RKC6C, Android 16): dumpsys confirms `ProgressStyle` and `showChronometer` are attached.
+
 ## 0.1.27
 
 ### 修复

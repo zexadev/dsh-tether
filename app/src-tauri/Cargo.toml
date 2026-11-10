@@ -1,6 +1,6 @@
 [package]
 name = "dsh-tether-app"
-version = "0.1.27"
+version = "0.1.28"
 edition = "2021"
 license = "MIT"
 
@@ -24,3 +24,6 @@ tauri-plugin-opener = "2.5.4"
 tauri-plugin-dshlocal = { path = "../plugins/tauri-plugin-dshlocal" }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 tar = "0.4"
+# iroh 引入的 reqwest 以 rustls-no-provider 构建,必须由应用安装全局 crypto
+# provider(与 iroh 默认 tls-ring 同一后端),否则建端点时 panic(安卓实测复现)
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

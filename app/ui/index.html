@@ -24,6 +24,7 @@
         <span id="local-state" class="host-meta" data-i18n="local.idle"></span>
       </div>
       <p class="hint" data-i18n="local.hint"></p>
+      <p id="local-card-note" class="hint hidden" data-i18n="local.bgNote"></p>
       <button id="local-open" class="btn btn-block" data-i18n="local.start"></button>
       <button id="local-stop" class="btn btn-quiet btn-block hidden" data-i18n="local.stop"></button>
       <p id="local-error" class="error hidden"></p>
@@ -34,11 +35,23 @@
     <p id="hosts-empty" class="empty hidden" data-i18n="hosts.empty"></p>
     <p id="hosts-error" class="error hidden"></p>
     <button id="add-host" class="btn btn-block" data-i18n="hosts.add"></button>
-    <button id="hosts-back" class="btn btn-quiet btn-block hidden" data-i18n="hosts.back"></button>
+    <button id="hosts-back" class="btn btn-quiet btn-block" data-i18n="hosts.back"></button>
+    <p id="battery-hint" class="hint hidden" data-i18n="hosts.batteryHint"></p>
     <footer class="about">
       <span id="about-version">DSH Tether</span>
-      <a id="about-link" class="about-link hidden" href="#" data-i18n="about.link"></a>
+      <button id="open-about" class="btn btn-slim btn-slim-quiet" data-i18n="about.entry"></button>
     </footer>
+  </main>
+
+  <main id="view-about" class="view hidden">
+    <h1>DSH Tether</h1>
+    <p id="about-version-line" class="hint"></p>
+    <button id="about-github" class="btn btn-block">GitHub</button>
+    <button id="about-update" class="btn btn-quiet btn-block" data-i18n="update.check"></button>
+    <p id="update-status" class="hint hidden"></p>
+    <h1 data-i18n="about.thanksTitle"></h1>
+    <p class="hint" data-i18n="about.thanks"></p>
+    <button id="about-back" class="btn btn-quiet btn-block" data-i18n="hosts.back"></button>
   </main>
 
   <main id="view-pair" class="view hidden">
@@ -67,7 +80,8 @@
       <button id="reconnect" class="btn btn-block" data-i18n="status.reconnect"></button>
       <button id="open-hosts" class="btn btn-quiet btn-block" data-i18n="status.switch"></button>
     </div>
-    <p id="connecting-note" class="empty" data-i18n="status.opening"></p>
+    <p id="connecting-note" class="empty" data-i18n="status.connectingPc"></p>
+    <p id="local-bg-note" class="hint hidden" data-i18n="status.localBg"></p>
   </main>
 
   <iframe id="webui" class="webui hidden" title="DeepSeek Harness"></iframe>

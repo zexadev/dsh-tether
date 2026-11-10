@@ -139,7 +139,7 @@ The Termux route still works if you prefer it: install dsh and this plugin insid
 - The interface on the phone is DSH's own; the narrow-screen fit comes from minimal injected styles, so a dsh layout change may need a follow-up here.
 - English and Chinese: the app follows your phone's system language, terminal output follows the computer's, and the part injected into the dsh interface follows dsh's own language setting. There is no separate language switch.
 - Local mode exists only in the `arm64` build, never on iOS; the phone lacks bash and a full coreutils, so shell-dependent tools are incomplete. The `arm64` APK is about 83 MB because of the bundled runtime; the others are about 32 MB.
-- Verified against dsh **`0.1.0-rc.7`**, **`0.1.0-rc.8`**, **`0.1.2`** (alpha and rc.1), **`0.1.5-alpha.1`**, **`0.1.5-rc.2`**, **`0.1.6-alpha.2`**, **`0.1.7-rc.2`**, **`0.2.0-rc.2`**, **`0.2.1-alpha.1`**, **`0.2.1-alpha.2`**, **`0.2.1-rc.2`**, **`0.2.1-rc.3`**, **`0.2.1-rc.5`** and **`0.2.2-alpha.2`**. dsh is in developer preview — check this line before assuming a newer dsh works. From 0.1.7 dsh refuses to install a plugin whose declared range does not cover it, so a version outside this line is a refusal at install time rather than a silent risk. The browser authentication dsh introduced in 0.1.2-alpha is handled entirely on the machine side; the phone app needs no update for it.
+- Verified against dsh **`0.1.0-rc.7`**, **`0.1.0-rc.8`**, **`0.1.2`** (alpha and rc.1), **`0.1.5-alpha.1`**, **`0.1.5-rc.2`**, **`0.1.6-alpha.2`**, **`0.1.7-rc.2`**, **`0.2.0-rc.2`**, **`0.2.1-alpha.1`**, **`0.2.1-alpha.2`**, **`0.2.1-rc.2`**, **`0.2.1-rc.3`**, **`0.2.1-rc.5`**, **`0.2.2-alpha.2`** and **`0.2.2-rc.1`**. dsh is in developer preview — check this line before assuming a newer dsh works. From 0.1.7 dsh refuses to install a plugin whose declared range does not cover it, so a version outside this line is a refusal at install time rather than a silent risk. The browser authentication dsh introduced in 0.1.2-alpha is handled entirely on the machine side; the phone app needs no update for it.
 
 ## What has been verified
 
@@ -173,7 +173,7 @@ No. The app owns an iroh endpoint (QUIC with a custom ALPN) and feeds the DSH in
 
 ### Which dsh versions are supported?
 
-The list under [Known limitations](#known-limitations), currently `0.1.0-rc.7` through `0.2.2-alpha.2`. From dsh 0.1.7 the install is refused outright when the declared range does not cover your dsh, so an unsupported version fails at install time instead of silently misbehaving.
+The list under [Known limitations](#known-limitations), currently `0.1.0-rc.7` through `0.2.2-rc.1`. From dsh 0.1.7 the install is refused outright when the declared range does not cover your dsh, so an unsupported version fails at install time instead of silently misbehaving.
 
 ### The interface sits at "Loading workspace…", or "Select workspace" reports `AbortSignal.any is not a function`
 

@@ -173,7 +173,7 @@ input::placeholder { color: var(--muted); }
   font-size: 11px;
   color: var(--muted);
 }
-.about-link { color: var(--muted); }
+#about-version { flex: 1; cursor: pointer; }
 .host-meta {
   font-size: 11px;
   color: var(--muted);

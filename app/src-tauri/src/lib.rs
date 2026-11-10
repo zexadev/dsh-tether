@@ -463,6 +463,36 @@ async fn local_stop(app: AppHandle) {
     }
 }
 
+/// 远程连接的后台保活:退到后台时前端调用,挂一条静默常驻通知让系统把进程
+/// 当前台进程,iroh 连接才不会因为 Doze / 缓存冻结而断。非 Android 无事发生。
+#[tauri::command]
+fn keep_alive_start(app: AppHandle, title: String, text: String) {
+    let _ = tauri_plugin_dshlocal::start_keep_alive(&app, &title, &text);
+}
+
+#[tauri::command]
+fn keep_alive_stop(app: AppHandle) {
+    let _ = tauri_plugin_dshlocal::stop_keep_alive(&app);
+}
+
+/// 通知权限:Rust 侧走插件的原生请求。JS 的 Notification.requestPermission 在
+/// Android WebView 里是摆设(永远返回 granted,但系统 POST_NOTIFICATIONS 根本没
+/// 给,通知被系统静默丢弃),必须走 Kotlin 侧的原生权限请求(Android 13+ 弹半屏
+/// 授权框,13 以下无此权限、恒为已授权)。
+#[tauri::command]
+fn notify_permission_state(app: AppHandle) -> bool {
+    use tauri::plugin::PermissionState;
+    use tauri_plugin_notification::NotificationExt;
+    matches!(app.notification().permission_state().ok(), Some(PermissionState::Granted))
+}
+
+#[tauri::command]
+fn notify_request_permission(app: AppHandle) -> bool {
+    use tauri::plugin::PermissionState;
+    use tauri_plugin_notification::NotificationExt;
+    matches!(app.notification().request_permission().ok(), Some(PermissionState::Granted))
+}
+
 /// 本机 dsh 的最近输出;启动失败时给用户看原因
 #[tauri::command]
 async fn local_log(app: AppHandle) -> Vec<String> {
@@ -483,6 +513,13 @@ async fn local_log(app: AppHandle) -> Vec<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // iroh 引入的 reqwest 0.13 以 rustls-no-provider 构建:任何普通 reqwest 客户端
+    // 在第一次构建时 panic("No rustls crypto provider is configured")——手机上
+    // 打开 App 自动重连,端点一建就崩(Android 16 真机实测复现,release 与 debug
+    // 同样)。在这里装全局默认 provider,ring 与 iroh 默认的 tls-ring 同一后端,
+    // 零额外链接成本;重复安装返回 Err,忽略即可。
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
@@ -499,7 +536,11 @@ pub fn run() {
             local_status,
             local_start,
             local_stop,
-            local_log
+            local_log,
+            keep_alive_start,
+            keep_alive_stop,
+            notify_permission_state,
+            notify_request_permission
         ])
         .setup(|app| {
             // 窗口改在这里建(配置里 create: false):启动脚本只能在建窗口时挂,

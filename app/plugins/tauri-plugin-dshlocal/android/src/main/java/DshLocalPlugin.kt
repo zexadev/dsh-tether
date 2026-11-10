@@ -33,4 +33,20 @@ class DshLocalPlugin(private val activity: Activity) : Plugin(activity) {
     activity.stopService(Intent(activity, DshLocalService::class.java))
     invoke.resolve()
   }
+
+  @Command
+  fun startKeepAlive(invoke: Invoke) {
+    val args = invoke.parseArgs(ServiceArgs::class.java)
+    val intent = Intent(activity, DshKeepAliveService::class.java)
+      .putExtra(DshKeepAliveService.EXTRA_TITLE, args.title)
+      .putExtra(DshKeepAliveService.EXTRA_TEXT, args.text)
+    ContextCompat.startForegroundService(activity, intent)
+    invoke.resolve()
+  }
+
+  @Command
+  fun stopKeepAlive(invoke: Invoke) {
+    activity.stopService(Intent(activity, DshKeepAliveService::class.java))
+    invoke.resolve()
+  }
 }

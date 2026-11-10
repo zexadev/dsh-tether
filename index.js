@@ -479,6 +479,63 @@ function mountTetherUi(ctx) {
 }
 
 /**
+ * 设置壳(带左侧导航的那个大弹窗)的窄屏样式。选择器认结构不认类名:
+ * `> nav` 里还套着 `navList` 的 modal 对话框就是设置壳;0.2.2-rc 的原生
+ * 侧栏抽屉里 nav 不带 navList,不会被误伤。
+ *
+ * 壳本身的盒子:铺满直角是窄屏下最差的观感,收成 dsh 自己的圆角卡片(圆角用
+ * 它的 --dsw-radius-panel,和桌面一致),四周留 12px 边距。
+ *
+ * 壳内部的版式按 DOM 结构区分,不读版本号(注入侧拿不到,也不该为这个去碰
+ * 解析器):
+ * - 0.2.2-rc.1 起,dsh 自带 ≤767px 的窄屏布局(标题+关闭 / 标签 / 内容 三行
+ *   网格),nav 前面还有标题 div,版式本身是对的——不碰它的 display,只改盒子。
+ * - 更早的版本,壳是「左导航 + 右内容」,nav 是第一个孩子。按
+ *   `> nav:first-child` 这个结构特征只给旧版做竖排:标题与标签行在上、内容
+ *   占满下面。头部(操作+关闭键)留在内容 div 的流内,不再钉到右上角——
+ *   那会盖住标签行;留在流内就没有任何重叠。
+ *
+ * 其余弹窗——登录、预览版说明、确认框——本来就是 dsh 的居中圆角卡片
+ * (原生 380px 宽 + 圆角),一律不碰。`data-dsh-tether` 的排除保留:配对串/
+ * 配置文件查看器是插件自己的弹窗,不归这里管。
+ */
+const shellDialogCss = `
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]):has(> nav [class*="navList"]) {
+    width: calc(100% - 24px) !important;
+    max-width: none !important;
+    height: calc(100% - 24px) !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border-radius: var(--dsw-radius-panel) !important;
+  }
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]):has(> nav:first-child [class*="navList"]) {
+    flex-direction: column !important;
+  }
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]):has(> nav:first-child [class*="navList"]) > nav {
+    width: 100% !important;
+    height: auto !important;
+    flex: none !important;
+  }
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]):has(> nav:first-child [class*="navList"]) > nav [class*="navList"] {
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    height: auto !important;
+    gap: 6px;
+    scrollbar-width: none;
+  }
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]):has(> nav:first-child [class*="navList"]) > nav [class*="navList"]::-webkit-scrollbar { display: none; }
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]):has(> nav:first-child [class*="navList"]) > nav [class*="navCell"] {
+    flex: none !important;
+    width: auto !important;
+    white-space: nowrap;
+  }
+  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]):has(> nav:first-child [class*="navList"]) > div {
+    width: 100% !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }`
+
+/**
  * 窄屏修正:只在 ≤640px 生效,桌面浏览器拿到同一份 index.html 也不受影响。
  * 只用语义选择器(role/aria),不碰 dsh 的 CSS Module 类名——那些名字带内容
  * 哈希,dsh 一改样式就会变,针对它们写规则必碎。
@@ -497,15 +554,6 @@ const tetherCss = `
 @media (max-width: 640px) {
   /* hero 背后的装饰性发光椭圆比视口宽,会让整页能被横向拖动 */
   html, body { overflow-x: hidden; }
-  /* 弹窗在窄屏铺满,别再留出用不上的边距 */
-  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-  }
   /* 设置行是「说明文字 + 控件」一行排开,说明列 min-width:0,窄屏被控件挤到
      2px 宽,中文于是一字一行。让说明占满一行、控件换到下一行。
      选择器咬的是 CSS Module 的本地名(row/rowText),只有哈希前缀会随构建变;
@@ -515,33 +563,19 @@ const tetherCss = `
   [class*="_row"]:has(> [class*="rowText"]) { flex-wrap: wrap !important; }
   [class*="_row"] > [class*="rowText"] { flex: 1 1 100% !important; }
 
-  /* 弹窗是「左导航 + 右内容」横向排列,导航固定 188px——在 412px 的手机上
-     占掉 45%,内容只剩两百出头。改成导航横排在顶、内容占满整宽。
-     导航是 <nav> 标签、内容是弹窗下唯一的直接 div,都用结构选择器命中。 */
-  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) { display: flex !important; flex-direction: column !important; }
-  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) > nav {
-    width: 100% !important;
-    height: auto !important;
-    flex: none !important;
-  }
-  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) > nav [class*="navList"] {
-    flex-direction: row !important;
-    overflow-x: auto !important;
-    height: auto !important;
-    gap: 6px;
-    scrollbar-width: none;
-  }
-  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) > nav [class*="navList"]::-webkit-scrollbar { display: none; }
-  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) > nav [class*="navCell"] {
-    flex: none !important;
-    width: auto !important;
-    white-space: nowrap;
-  }
-  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) > div {
-    width: 100% !important;
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-  }
+${shellDialogCss}
+
+  /* 会话内容自适应:agent 输出的图片、表格、代码块不把页面撑过视口宽——
+     宽内容在自己的盒子里横向滚动,页面本身不产生横向溢出。选择器认 dsh
+     标在会话滚动容器上的 [data-conversation-scroll] 属性,只作用在会话里,
+     不碰界面自己的图标和控件。 */
+  [data-conversation-scroll] img,
+  [data-conversation-scroll] video,
+  [data-conversation-scroll] canvas { max-width: 100% !important; height: auto; }
+  [data-conversation-scroll] pre,
+  [data-conversation-scroll] table { max-width: 100%; }
+  /* 长到没法折行的原文(路径、命令、哈希)在会话里折行,别把行撑出去 */
+  [data-conversation-scroll] { overflow-wrap: break-word; }
   /* 侧栏展开时主框架把网格从「56px 内容」改成「280px 内容」,对话区被压到
      140px。改成抽屉:网格保持收起时的列宽,侧栏浮到内容之上盖住一部分。
      展开态读 dsh 自己写在 frame 上的 data-sidebar-collapsed(收起为 "true",
@@ -604,19 +638,6 @@ const tetherCss = `
   /* 触摸时安卓 WebView 会按元素的 DOM 盒子刷一块蓝色高亮,方角、盖住圆角,
      和 dsh 自己的按下态叠在一起很脏。关掉它,按下反馈交给页面自己的样式。 */
   * { -webkit-tap-highlight-color: transparent; }
-
-  /* 竖排之后,内容区自带的头部(关闭键)会落到标签栏下方、屏幕
-     正中,很别扭。钉到弹窗右上角,与标题同一行——手机弹窗关闭键就该在那儿。 */
-  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) { position: relative !important; }
-  [role="dialog"][aria-modal="true"]:not([data-dsh-tether]) > div > [class*="_header"] {
-    position: absolute !important;
-    top: 10px;
-    right: 12px;
-    left: auto !important;
-    width: auto !important;
-    height: auto !important;
-    z-index: 2;
-  }
 }`
 
 // 抽屉遮罩只是画上去的,点它不会收起——那需要脚本。这段只做这一件事:
@@ -711,13 +732,14 @@ const tetherScript = `
 
   // 侧栏底部的 sidebar.footer.action 插槽:官方留给第三方放自己入口的位置。
   // 这里放「主机」按钮,点了让外层的手机客户端打开它自己的主机页。
-  // 同一个按钮两种归宿:手机 App 里打开它自己的主机页;电脑浏览器里出示配对串,
-  // 好让用户换手机、加设备时有地方拿新配对码(否则只能去删 paired.json)。
+  // 同一个按钮两种归宿:手机 App 里打开它自己的主机页;电脑浏览器/桌面端打开
+  // 「连接手机」功能页(配对新手机、已配对设备、使用说明),好让用户换手机、
+  // 加设备时有地方拿新配对码(否则只能去删 paired.json)。
   // 判据是「App 自己挂的标记」,不是「我在不在 iframe 里」:dsh 桌面端的插件界面
   // 同样跑在宿主的内嵌 frame 里,按 window.parent !== window 判会被当成手机 App,
   // 按钮变「我的电脑」、点了只往父窗口发一条消息——桌面端没有这条消息的监听者,
-  // 按钮就是死的。标记拿不到一律按浏览器处理,出示配对串,至少点得动;
-  // 0.1.24 及更早的 App 没有这个标记,在 App 里也会出示配对串(它自己的顶栏有
+  // 按钮就是死的。标记拿不到一律按浏览器处理,打开功能页,至少点得动;
+  // 0.1.24 及更早的 App 没有这个标记,在 App 里也会打开功能页(它自己的顶栏有
   // 「主机」入口,功能不丢)。
   var inApp = !!window.__DSH_TETHER_APP__
 
@@ -805,19 +827,161 @@ const tetherScript = `
     return box
   }
 
+  // —— 「连接手机」功能页 ——
+  // 侧栏按钮在浏览器/桌面端打开的是这个功能页:配对新手机、已配对设备管理、
+  // 使用说明三段,不再是原来只有一个配对串的查看页。样式 token 与 viewer 同源,
+  // 窄屏铺满、宽屏居中卡片,行为也一致(宽屏点遮罩关闭)。
   function showPairing() {
-    fetch('${PAIRING_PATH}', { headers: langHeaders() })
-      .then(function (r) { return r.ok ? r.json() : r.text().then(function (t) { throw new Error(t) }) })
-      .then(function (d) {
-        viewer(
-          tx('在手机上「添加电脑」里粘贴整行,', 'Paste the whole line into “Add a computer” on the phone; valid for ')
-            + Math.round(d.expiresInSec / 60) + tx(' 分钟内有效', ' min'),
-          d.pairingString,
-          undefined,
-          devicesBlock,
-        )
-      })
-      .catch(function (e) { viewer(tx('配对', 'Pairing'), '', String(e && e.message ? e.message : e)) })
+    var dark = matchMedia('(prefers-color-scheme: dark)').matches
+    var t = dark
+      ? { fg: '#f9fafb', surface: '#2c2c2e', line: 'rgba(255,255,255,.12)', muted: '#adb2b8', danger: '#f5766b', fill: '#353638' }
+      : { fg: '#0f1115', surface: '#ffffff', line: 'rgba(0,0,0,.1)', muted: '#81858c', danger: '#b42318', fill: '#f5f6f7' }
+
+    var mask = document.createElement('div')
+    mask.setAttribute('data-dsh-tether', 'viewer')
+    mask.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;'
+      + 'font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;color:' + t.fg + ';'
+      + (narrow.matches ? 'background:' + t.surface : 'background:rgba(0,0,0,.32);padding:24px')
+
+    var card = document.createElement('div')
+    card.setAttribute('data-dsh-tether', 'card')
+    card.setAttribute('role', 'dialog')
+    card.setAttribute('aria-modal', 'true')
+    card.style.cssText = 'display:flex;flex-direction:column;background:' + t.surface + ';'
+      + (narrow.matches
+        ? 'width:100%;height:100%'
+        : 'width:min(560px,100%);max-height:min(80vh,720px);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.24)')
+
+    // dsh 的次要按钮就是这个样子:透明底 + 1px 描边 + 14 圆角 + 12px 常规字重
+    var slim = 'flex:none;font:inherit;font-size:12px;font-weight:400;padding:5px 12px;border-radius:14px;'
+      + 'border:1px solid ' + t.line + ';background:transparent;color:inherit;cursor:pointer'
+
+    var bar = document.createElement('div')
+    bar.style.cssText = 'flex:none;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid ' + t.line
+    var name = document.createElement('div')
+    name.style.cssText = 'flex:1;min-width:0;font-size:16px;font-weight:500'
+    name.textContent = tx('连接手机', 'Connect a phone')
+    var close = document.createElement('button')
+    close.textContent = tx('关闭', 'Close')
+    close.style.cssText = slim
+    close.addEventListener('click', function () { mask.remove() })
+    bar.append(name, close)
+
+    var body = document.createElement('div')
+    body.style.cssText = 'flex:1;min-height:0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:18px'
+
+    function sectionTitle(text) {
+      var head = document.createElement('div')
+      head.style.cssText = 'font-size:12px;color:' + t.muted + ';padding-bottom:8px;font-weight:500'
+      head.textContent = text
+      return head
+    }
+
+    // —— 配对新手机 ——
+    var pairBox = document.createElement('div')
+    pairBox.style.cssText = 'flex:none'
+    pairBox.append(sectionTitle(tx('配对新手机', 'Pair a new phone')))
+    var pairRow = document.createElement('div')
+    pairRow.style.cssText = 'display:flex;align-items:center;gap:8px'
+    var pairCode = document.createElement('div')
+    pairCode.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+      + 'font:13px/1.8 ui-monospace,"SF Mono",Consolas,monospace;background:' + t.fill + ';border-radius:8px;padding:8px 12px'
+    pairCode.textContent = tx('获取中…', 'Fetching…')
+    var copy = document.createElement('button')
+    copy.textContent = tx('复制', 'Copy')
+    copy.style.cssText = slim
+    copy.disabled = true
+    copy.addEventListener('click', function () {
+      if (!pairingValue) return
+      navigator.clipboard.writeText(pairingValue).then(
+        function () { copy.textContent = tx('已复制', 'Copied') },
+        function () { copy.textContent = tx('复制失败', 'Copy failed') },
+      )
+    })
+    var refresh = document.createElement('button')
+    refresh.textContent = tx('重新获取', 'Refresh')
+    refresh.style.cssText = slim
+    refresh.addEventListener('click', fetchPairing)
+    pairRow.append(pairCode, copy, refresh)
+    var pairHint = document.createElement('div')
+    pairHint.style.cssText = 'font-size:12px;color:' + t.muted + ';margin-top:8px'
+    pairBox.append(pairRow, pairHint)
+
+    // 配对串的获取与有效期倒计时;过期后只有「重新获取」一条路
+    var pairingValue = null
+    var tick = null
+    var expiresAt = 0
+    function fetchPairing() {
+      pairingValue = null
+      copy.disabled = true
+      copy.textContent = tx('复制', 'Copy')
+      if (tick !== null) { clearInterval(tick); tick = null }
+      pairCode.textContent = tx('获取中…', 'Fetching…')
+      pairHint.style.color = t.muted
+      pairHint.textContent = ''
+      fetch('${PAIRING_PATH}', { headers: langHeaders() })
+        .then(function (r) { return r.ok ? r.json() : r.text().then(function (x) { throw new Error(x) }) })
+        .then(function (d) {
+          pairingValue = d.pairingString
+          expiresAt = Date.now() + d.expiresInSec * 1000
+          pairCode.textContent = d.pairingString
+          pairCode.title = d.pairingString
+          copy.disabled = false
+          tick = setInterval(function () {
+            var left = Math.max(0, Math.round((expiresAt - Date.now()) / 1000))
+            if (left === 0) {
+              clearInterval(tick)
+              tick = null
+              pairingValue = null
+              copy.disabled = true
+              pairHint.style.color = t.danger
+              pairHint.textContent = tx('配对串已失效,点「重新获取」。', 'The pairing string expired — press "Refresh".')
+              return
+            }
+            pairHint.textContent = tx('在手机上「添加电脑」里整行粘贴。', 'Paste the whole line into “Add a computer” on the phone.')
+              + ' ' + Math.floor(left / 60) + ':' + ('0' + (left % 60)).slice(-2)
+          }, 1000)
+        })
+        .catch(function (e) {
+          pairHint.style.color = t.danger
+          pairHint.textContent = tx('获取失败: ', 'Fetch failed: ') + (e && e.message ? e.message : e)
+          pairCode.textContent = tx('获取失败', 'Fetch failed')
+        })
+    }
+    fetchPairing()
+
+    // —— 已配对设备 ——(与旧查看页同一份列表:名称、在线状态、两步移除)
+    var devices = devicesBlock(t, slim)
+
+    // —— 使用说明 ——
+    var guide = document.createElement('div')
+    guide.style.cssText = 'flex:none;border-top:1px solid ' + t.line + ';padding-top:14px'
+    guide.append(sectionTitle(tx('使用说明', 'How it works')))
+    var steps = [
+      tx('在手机上安装 DSH Tether(github.com/zexadev/dsh-tether)。', 'Install DSH Tether on your phone (github.com/zexadev/dsh-tether).'),
+      tx('App 里点「添加电脑」,把上面的配对串整行粘贴。', 'In the app, tap “Add a computer” and paste the pairing string above.'),
+      tx('配对成功后,手机即可远程使用这台电脑上的 dsh;审批请求会以通知送到手机。', 'Once paired, the phone can use dsh on this computer remotely; approval requests arrive as notifications on the phone.'),
+    ]
+    for (var i = 0; i < steps.length; i++) {
+      var step = document.createElement('div')
+      step.style.cssText = 'display:flex;gap:8px;font-size:13px;line-height:1.7;margin-bottom:6px'
+      var num = document.createElement('span')
+      num.style.cssText = 'flex:none;width:18px;height:18px;border-radius:50%;background:' + t.fill + ';color:' + t.muted
+        + ';font-size:11px;display:flex;align-items:center;justify-content:center'
+      num.textContent = String(i + 1)
+      var text = document.createElement('span')
+      text.style.cssText = 'min-width:0'
+      text.textContent = steps[i]
+      step.append(num, text)
+      guide.append(step)
+    }
+
+    body.append(pairBox, devices, guide)
+    card.append(bar, body)
+    mask.append(card)
+    // 宽屏点遮罩关闭,窄屏没有遮罩可点
+    if (!narrow.matches) mask.addEventListener('click', function (e) { if (e.target === mask) mask.remove() })
+    document.body.append(mask)
   }
 
   // 可抄样式的参照行。浏览器侧是「设置」:triggerRow(定高的横排容器)套 trigger
@@ -881,7 +1045,7 @@ const tetherScript = `
       : phoneIcon(referenceIconWidth(reference.trigger))
     button.innerHTML = icon + '<span data-dsh-tether="hosts-label">' + label + '</span>'
     button.addEventListener('click', function () {
-      if (inApp) window.parent.postMessage({ type: 'dsh-tether:open-hosts' }, '*')
+      if (inApp) openHostsPanel()
       else showPairing()
     })
     row.append(button)
@@ -958,6 +1122,469 @@ const tetherScript = `
 
   mountHostsTrigger()
   new MutationObserver(mountHostsTrigger).observe(document.documentElement, { childList: true, subtree: true })
+
+  // —— 连接阶段的加载文字 ——
+  // 手机 App 里,连接阶段把 dsh 自己的加载文字「正在加载工作区… / Loading
+  // workspaces…」改写成「正在连接至电脑」;顶层 App 连上后会发
+  // dsh-tether:connected(iframe load 之后还会补发一次,覆盖「iframe 还没起来
+  // connected 就到了」的时序),收到即停,之后加载文字恢复 dsh 原文。
+  // 桌面浏览器与 dsh desktop 没有 App 标记,这段完全不生效。
+  if (inApp) {
+    var tetherConnected = false
+    window.addEventListener('message', function (event) {
+      var data = event.data
+      if (data && data.type === 'dsh-tether:connected') tetherConnected = true
+    })
+    function connectingText(text) {
+      if (text === '正在加载工作区…') return '正在连接至电脑'
+      if (text === 'Loading workspaces…') return 'Connecting to the computer'
+      return null
+    }
+    function rewriteLoadingNode(node) {
+      if (node.nodeType === 3) {
+        var next = connectingText(node.data)
+        if (next !== null && node.data !== next) node.data = next
+        return
+      }
+      // 加载状态行是「一个元素只含这一句文本」,整体替换最省事;
+      // 带子元素的节点不碰,交给它自己的文本节点进到上面的分支
+      if (node.nodeType === 1 && node.children.length === 0) {
+        var next2 = connectingText(node.textContent)
+        if (next2 !== null) node.textContent = next2
+      }
+    }
+    new MutationObserver(function (records) {
+      if (tetherConnected) return
+      for (var i = 0; i < records.length; i++) {
+        var record = records[i]
+        if (record.type === 'characterData') rewriteLoadingNode(record.target)
+        for (var j = 0; j < record.addedNodes.length; j++) rewriteLoadingNode(record.addedNodes[j])
+      }
+    }).observe(document.documentElement, { childList: true, characterData: true, subtree: true })
+  }
+
+  // ===== 「我的电脑」面板:长在 dsh 界面里,不再把整个界面交给 App 外壳 =====
+  // 侧栏按钮/App 顶栏的「主机」在 dsh 界面内部切换「会话 / 我的电脑」两栏
+  // tab,不再整页切走(割裂感就是那个整页切换)。数据与动作经 postMessage 走
+  // 外层 App 的 Rust:invoke 请求带 id,结果/事件原路回;本地模式的启停与
+  // 打开外链是专用消息。面板样式全部用 dsh 自己的 --dsw-* 变量,主题语言
+  // 都跟 dsh 走,不另起一套。
+  if (inApp) {
+    var tetherInvokeSeq = 0
+    var tetherInvokeWaiters = {}
+    var panelData = { hosts: [], current: null, local: null, remote: null, localProgress: null, version: '' }
+    var panelEl = null
+    var panelPairing = false
+    var panelUpdateFound = null
+
+    var PT = {
+      bg: 'var(--dsw-alias-bg-base)',
+      surface: 'var(--dsw-alias-bg-layer-2)',
+      fg: 'var(--dsw-alias-label-primary)',
+      muted: 'var(--dsw-alias-label-tertiary)',
+      line: 'var(--dsw-alias-border-l3)',
+      fill: 'var(--dsw-alias-interactive-bg-hover)',
+      danger: 'var(--dsw-alias-state-error-primary)',
+      ok: 'var(--dsw-alias-state-success-primary)',
+      warn: 'var(--dsw-alias-state-warn-primary)',
+    }
+
+    function tetherInvoke(cmd, args) {
+      return new Promise(function (resolve, reject) {
+        var id = ++tetherInvokeSeq
+        tetherInvokeWaiters[id] = { resolve: resolve, reject: reject }
+        window.parent.postMessage({ type: 'dsh-tether:invoke', id: id, cmd: cmd, args: args || {} }, '*')
+        setTimeout(function () {
+          var w = tetherInvokeWaiters[id]
+          if (!w) return
+          delete tetherInvokeWaiters[id]
+          w.reject(new Error('timeout'))
+        }, 15000)
+      })
+    }
+
+    window.addEventListener('message', function (event) {
+      var data = event.data
+      if (!data) return
+      if (data.type === 'dsh-tether:invoke-result') {
+        var w = tetherInvokeWaiters[data.id]
+        if (!w) return
+        delete tetherInvokeWaiters[data.id]
+        if (data.ok) w.resolve(data.value)
+        else w.reject(new Error(data.error || 'invoke failed'))
+      } else if (data.type === 'dsh-tether:event') {
+        if (data.name === 'remote:state') panelOnRemote(data.payload)
+        else if (data.name === 'local:state') panelOnLocal(data.payload)
+      } else if (data.type === 'dsh-tether:open-hosts') {
+        openHostsPanel()
+      }
+    })
+
+    function panelOnRemote(payload) {
+      panelData.remote = payload
+      renderHostsPanel()
+    }
+    function panelOnLocal(payload) {
+      panelData.localProgress = payload
+      renderHostsPanel()
+    }
+
+    // 面板自带的消息:本地模式启停、外链
+    function panelLocalStart() { window.parent.postMessage({ type: 'dsh-tether:local-start' }, '*') }
+    function panelLocalStop() { window.parent.postMessage({ type: 'dsh-tether:local-stop' }, '*') }
+    function panelOpenUrl(url) { window.parent.postMessage({ type: 'dsh-tether:open-url', url: url }, '*') }
+
+    function panelBtn(text, primary) {
+      var b = document.createElement('button')
+      b.textContent = text
+      b.style.cssText = 'flex:none;font:inherit;font-size:12px;font-weight:400;padding:5px 12px;border-radius:14px;cursor:pointer;color:' + PT.fg + ';'
+        + (primary
+          ? 'border:1px solid transparent;background:' + PT.fill
+          : 'border:1px solid ' + PT.line + ';background:transparent')
+      return b
+    }
+
+    function panelSection(title) {
+      var box = document.createElement('div')
+      box.style.cssText = 'flex:none;border-top:1px solid ' + PT.line + ';padding:14px 0'
+      var head = document.createElement('div')
+      head.style.cssText = 'font-size:12px;color:' + PT.muted + ';padding-bottom:8px;font-weight:500'
+      head.textContent = title
+      box.append(head)
+      return box
+    }
+
+    function panelHostRow(host) {
+      var row = document.createElement('div')
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 0'
+      var main = document.createElement('button')
+      main.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;text-align:left;font:inherit;'
+        + 'color:' + PT.fg + ';background:' + PT.surface + ';border:1px solid ' + PT.line + ';border-radius:12px;padding:8px 12px;cursor:pointer'
+      var nm = document.createElement('span')
+      nm.style.cssText = 'font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+      nm.textContent = host.label || shortHostId(host.id)
+      var meta = document.createElement('span')
+      meta.style.cssText = 'font-size:11px;color:' + PT.muted
+      meta.textContent = host.id === panelData.current ? tx('上次使用', 'last used') : shortHostId(host.id)
+      main.append(nm, meta)
+      main.addEventListener('click', function () {
+        tetherInvoke('connect', { id: host.id }).catch(function (e) { panelFail(String(e)) })
+      })
+      row.append(main)
+      var rename = panelBtn(tx('改名', 'Rename'))
+      rename.addEventListener('click', function () {
+        var input = document.createElement('input')
+        input.value = host.label || ''
+        input.style.cssText = 'flex:1;min-width:0;font:inherit;font-size:13px;padding:8px 12px;border-radius:12px;'
+          + 'border:1px solid ' + PT.line + ';background:' + PT.bg + ';color:' + PT.fg + ';outline:none'
+        var save = panelBtn(tx('保存', 'Save'), true)
+        var cancel = panelBtn(tx('取消', 'Cancel'))
+        function done() { renderHostsPanel() }
+        save.addEventListener('click', function () {
+          tetherInvoke('rename_host', { id: host.id, label: input.value })
+            .then(function (book) { panelData.hosts = book.hosts || []; panelData.current = book.current || null; done() })
+            .catch(function (e) { panelFail(String(e)) })
+        })
+        cancel.addEventListener('click', done)
+        row.replaceChildren(input, save, cancel)
+        input.focus()
+      })
+      row.append(rename)
+      var del = panelBtn(tx('删除', 'Remove'))
+      var armed = false
+      del.addEventListener('click', function () {
+        if (!armed) {
+          armed = true
+          del.textContent = tx('确认删除?', 'Remove it?')
+          del.style.color = PT.danger
+          setTimeout(function () {
+            if (!armed) return
+            armed = false
+            del.textContent = tx('删除', 'Remove')
+            del.style.color = PT.fg
+          }, 4000)
+          return
+        }
+        armed = false
+        del.textContent = tx('删除', 'Remove')
+        del.style.color = PT.fg
+        tetherInvoke('forget_host', { id: host.id })
+          .then(function (book) { panelData.hosts = book.hosts || []; panelData.current = book.current || null; renderHostsPanel() })
+          .catch(function (e) { panelFail(String(e)) })
+      })
+      row.append(del)
+      return row
+    }
+
+    function panelPairForm(box) {
+      var mk = function (labelText, ph) {
+        var lab = document.createElement('div')
+        lab.style.cssText = 'font-size:12px;color:' + PT.muted + ';margin-bottom:10px'
+        lab.textContent = labelText
+        var input = document.createElement('input')
+        input.style.cssText = 'display:block;width:100%;margin-top:6px;font:inherit;font-size:16px;padding:10px 12px;border-radius:12px;'
+          + 'border:1px solid ' + PT.line + ';background:' + PT.bg + ';color:' + PT.fg + ';outline:none;box-sizing:border-box'
+        if (ph) input.placeholder = ph
+        lab.append(input)
+        return { lab: lab, input: input }
+      }
+      var peer = mk(tx('配对串', 'Pairing string'), tx('粘贴电脑上显示的那一整行', 'Paste the whole line shown on the computer'))
+      var code = mk(tx('配对码(已在上面粘贴则免填)', 'Pairing code (skip if the line above has one)'), tx('6 位数字', '6 digits'))
+      var label = mk(tx('给这台电脑起个名字', 'Name this computer'), '')
+      var name = mk(tx('本机名称(电脑上会显示成这个)', "This phone's name (shown on the computer)"), '')
+      var err = document.createElement('div')
+      err.style.cssText = 'font-size:12px;color:' + PT.danger + ';margin-top:8px;display:none'
+      var submit = panelBtn(tx('配对并连接', 'Pair and connect'), true)
+      var cancel = panelBtn(tx('取消', 'Cancel'))
+      var row = document.createElement('div')
+      row.style.cssText = 'display:flex;gap:8px;margin-top:12px'
+      row.append(submit, cancel)
+      box.append(peer.lab, code.lab, label.lab, name.lab, err, row)
+      cancel.addEventListener('click', function () { panelPairing = false; renderHostsPanel() })
+      submit.addEventListener('click', function () {
+        var v = peer.input.value.trim()
+        var c = code.input.value.trim()
+        if (v.indexOf('#') >= 0) {
+          var parts = v.split('#', 2)
+          v = parts[0].trim()
+          if (!c) c = parts[1].trim()
+        }
+        if (!v || !c) {
+          err.textContent = tx('配对串不完整:要电脑上显示的那一整行', 'Incomplete pairing string — paste the whole line shown on the computer')
+          err.style.display = 'block'
+          return
+        }
+        submit.disabled = true
+        tetherInvoke('pair', { peer: v, code: c, name: name.input.value, label: label.input.value })
+          .then(function () { refreshHostsPanel() })
+          .catch(function (e) {
+            submit.disabled = false
+            err.textContent = String(e && e.message ? e.message : e)
+            err.style.display = 'block'
+          })
+      })
+    }
+
+    function panelFail(text) {
+      panelData.remote = { status: 'disconnected', detail: text }
+      renderHostsPanel()
+    }
+
+    function panelLocalCard() {
+      var st = panelData.local
+      var box = panelSection(tx('本机运行 DSH', 'Run DSH on this phone'))
+      if (!st || !st.available) {
+        box.style.display = 'none'
+        return box
+      }
+      var head = document.createElement('div')
+      head.style.cssText = 'display:flex;align-items:center;gap:8px'
+      var title = document.createElement('div')
+      title.style.cssText = 'flex:1;min-width:0;font-size:13px'
+      title.textContent = tx('本机运行 DSH', 'Run DSH on this phone')
+      var state = document.createElement('span')
+      state.style.cssText = 'flex:none;font-size:11px;color:' + (st.running ? PT.ok : PT.muted)
+      state.textContent = st.running ? tx('运行中', 'Running') : tx('未启动', 'Not running')
+      head.append(title, state)
+      box.append(head)
+      if (st.running) {
+        var note = document.createElement('div')
+        note.style.cssText = 'font-size:11px;color:' + PT.muted + ';margin-top:6px;line-height:1.6'
+        note.textContent = tx('连接其它电脑后它也会继续在后台运行;要停,按下面的「停止本机 DSH」。', 'It keeps running in the background after you connect to another computer; stop it with the button below.')
+        box.append(note)
+      }
+      var progress = panelData.localProgress && panelData.localProgress.detail
+      if (progress) {
+        var prog = document.createElement('div')
+        prog.style.cssText = 'font-size:12px;color:' + PT.muted + ';margin-top:6px'
+        prog.textContent = progress
+        box.append(prog)
+      }
+      var row = document.createElement('div')
+      row.style.cssText = 'display:flex;gap:8px;margin-top:10px'
+      var open = panelBtn(st.running ? tx('打开', 'Open') : tx('在本机运行', 'Run on this phone'), true)
+      open.addEventListener('click', panelLocalStart)
+      row.append(open)
+      if (st.running) {
+        var stop = panelBtn(tx('停止本机 DSH', 'Stop DSH on this phone'))
+        stop.addEventListener('click', panelLocalStop)
+        row.append(stop)
+      }
+      box.append(row)
+      return box
+    }
+
+    function panelStatusBlock() {
+      var st = panelData.remote
+      var box = panelSection(tx('连接', 'Connection'))
+      if (st === null) { box.style.display = 'none'; return box }
+      var line = document.createElement('div')
+      line.style.cssText = 'font-size:13px;line-height:1.7'
+      if (st.status === 'connecting') line.textContent = tx('正在连接至电脑', 'Connecting to the computer')
+      else if (st.status === 'connected') { box.style.display = 'none'; return box }
+      else {
+        line.textContent = st.detail || tx('连接已断开', 'Connection closed')
+        line.style.color = PT.danger
+        var btn = panelBtn(tx('重新连接', 'Reconnect'), true)
+        btn.addEventListener('click', function () {
+          tetherInvoke('connect', { id: null }).catch(function (e) { panelFail(String(e)) })
+        })
+        var row = document.createElement('div')
+        row.style.cssText = 'margin-top:10px'
+        row.append(btn)
+        box.append(line, row)
+        return box
+      }
+      box.append(line)
+      return box
+    }
+
+    function panelAboutBlock() {
+      var box = panelSection(tx('关于与致谢', 'About & thanks'))
+      var ver = document.createElement('div')
+      ver.style.cssText = 'font-size:12px;color:' + PT.muted
+      ver.textContent = 'DSH Tether v' + panelData.version
+      var row = document.createElement('div')
+      row.style.cssText = 'display:flex;gap:8px;margin-top:10px;flex-wrap:wrap'
+      var github = panelBtn('GitHub', true)
+      github.addEventListener('click', function () { panelOpenUrl('https://github.com/zexadev/dsh-tether') })
+      var update = panelBtn(tx('检查更新', 'Check for updates'))
+      update.addEventListener('click', function () {
+        if (panelUpdateFound) { panelOpenUrl('https://github.com/zexadev/dsh-tether/releases'); return }
+        update.disabled = true
+        update.textContent = tx('检查中…', 'Checking…')
+        fetch('https://api.github.com/repos/zexadev/dsh-tether/releases/latest')
+          .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json() })
+          .then(function (d) {
+            var latest = String(d.tag_name || '').replace(/^v/, '')
+            if (panelNewer(latest, panelData.version)) {
+              panelUpdateFound = latest
+              update.textContent = tx('前往下载', 'Download')
+              ver.textContent = 'DSH Tether v' + panelData.version + ' → v' + latest
+            } else {
+              update.textContent = tx('已是最新', 'Up to date')
+            }
+          })
+          .catch(function () { update.textContent = tx('检查失败', 'Check failed') })
+          .then(function () { update.disabled = false })
+      })
+      row.append(github, update)
+      var thanks = document.createElement('div')
+      thanks.style.cssText = 'font-size:11px;color:' + PT.muted + ';margin-top:10px;line-height:1.7'
+      thanks.textContent = tx('DSH Tether 基于 DeepSeek Harness、iroh 与 Tauri 构建。感谢这些开源项目,也感谢每一位试用、反馈与支持的朋友。', 'DSH Tether is built on DeepSeek Harness, iroh and Tauri. Thanks to those projects, and to everyone who tried it, reported issues and helped.')
+      box.append(ver, row, thanks)
+      return box
+    }
+
+    function renderHostsPanel() {
+      if (!panelEl || panelEl.style.display === 'none') return
+      var body = panelEl.querySelector('[data-dsh-tether="panel-body"]')
+      body.replaceChildren()
+      var list = panelSection(tx('我的电脑', 'My computers'))
+      if (panelData.hosts.length === 0) {
+        var empty = document.createElement('div')
+        empty.style.cssText = 'font-size:12px;color:' + PT.muted
+        empty.textContent = tx('还没有配对过的电脑。', 'No computer paired yet.')
+        list.append(empty)
+      }
+      for (var i = 0; i < panelData.hosts.length; i++) list.append(panelHostRow(panelData.hosts[i]))
+      var add = document.createElement('div')
+      add.style.cssText = 'margin-top:10px'
+      var addBtn = panelBtn(tx('添加电脑', 'Add a computer'), true)
+      addBtn.addEventListener('click', function () { panelPairing = !panelPairing; renderHostsPanel() })
+      add.append(addBtn)
+      list.append(add)
+      body.append(panelStatusBlock())
+      body.append(list)
+      if (panelPairing) {
+        var pairBox = panelSection(tx('添加电脑', 'Add a computer'))
+        panelPairForm(pairBox)
+        body.append(pairBox)
+      }
+      body.append(panelLocalCard())
+      // 电池白名单提示:仅安卓有意义
+      if (/Android/i.test(navigator.userAgent)) {
+        var batt = document.createElement('div')
+        batt.style.cssText = 'flex:none;font-size:11px;color:' + PT.muted + ';line-height:1.7;padding:10px 0'
+        batt.textContent = tx('若退到后台后连接仍会断开(部分安卓系统会强杀后台应用),请在系统设置的电池/省电策略里把本应用设为「不限制」。', 'If the connection still drops in the background (some Android systems kill background apps aggressively), set this app to "Unrestricted" under the system battery settings.')
+        body.append(batt)
+      }
+      body.append(panelAboutBlock())
+    }
+
+    function ensureHostsPanel() {
+      if (panelEl) return
+      panelEl = document.createElement('div')
+      panelEl.setAttribute('data-dsh-tether', 'hosts-panel')
+      panelEl.style.cssText = 'position:fixed;inset:0;z-index:2147482000;display:none;flex-direction:column;'
+        + 'background:' + PT.bg + ';color:' + PT.fg + ';'
+        + 'font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif'
+
+      // 头部:两栏 tab「会话 / 我的电脑」
+      var bar = document.createElement('div')
+      bar.style.cssText = 'flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid ' + PT.line
+      function tab(text, active, onClick) {
+        var b = document.createElement('button')
+        b.textContent = text
+        b.style.cssText = 'font:inherit;font-size:13px;font-weight:400;padding:5px 14px;border-radius:14px;cursor:pointer;color:' + PT.fg + ';'
+          + (active
+            ? 'border:1px solid transparent;background:' + PT.fill
+            : 'border:1px solid ' + PT.line + ';background:transparent')
+        b.addEventListener('click', onClick)
+        return b
+      }
+      var toChat = tab(tx('会话', 'Chat'), false, function () { panelEl.style.display = 'none' })
+      var toHosts = tab(tx('我的电脑', 'My computers'), true, function () {})
+      var hint = document.createElement('div')
+      hint.style.cssText = 'flex:1;text-align:right;font-size:11px;color:' + PT.muted
+      hint.textContent = tx('长在 DSH 界面里,不再整页切走', '')
+      bar.append(toChat, toHosts, hint)
+      panelEl.append(bar)
+
+      var body = document.createElement('div')
+      body.setAttribute('data-dsh-tether', 'panel-body')
+      body.style.cssText = 'flex:1;min-height:0;overflow-y:auto;padding:2px 16px 24px'
+      panelEl.append(body)
+      document.body.append(panelEl)
+    }
+
+    function shortHostId(id) { return String(id || '').slice(0, 8) + '…' + String(id || '').slice(-4) }
+
+    function panelNewer(a, b) {
+      var pa = /^v?(\d+)\.(\d+)\.(\d+)/.exec(String(a || '').trim())
+      var pb = /^v?(\d+)\.(\d+)\.(\d+)/.exec(String(b || '').trim())
+      if (!pa || !pb) return false
+      for (var i = 1; i <= 3; i++) {
+        if (Number(pa[i]) !== Number(pb[i])) return Number(pa[i]) > Number(pb[i])
+      }
+      return false
+    }
+
+    function refreshHostsPanel() {
+      tetherInvoke('list_hosts').then(function (book) {
+        panelData.hosts = book.hosts || []
+        panelData.current = book.current || null
+        renderHostsPanel()
+      }).catch(function () {})
+      tetherInvoke('local_status').then(function (st) {
+        panelData.local = st
+        renderHostsPanel()
+      }).catch(function () {})
+      tetherInvoke('app_version').then(function (v) {
+        panelData.version = v
+        renderHostsPanel()
+      }).catch(function () {})
+    }
+
+    function openHostsPanel() {
+      ensureHostsPanel()
+      panelEl.style.display = 'flex'
+      refreshHostsPanel()
+    }
+
+    // 面板能力声明:App 据此决定顶栏「主机」按钮走面板还是走旧的主机页
+    window.parent.postMessage({ type: 'dsh-tether:panel-ready' }, '*')
+  }
 
   document.addEventListener('click', function (event) {
     if (!narrow.matches) return
