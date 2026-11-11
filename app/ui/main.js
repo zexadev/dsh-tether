@@ -149,15 +149,28 @@ function slimButton(text, onClick, quiet) {
   return b
 }
 
+/** index.html 里 <symbol> 定义的线条图标 */
+function icon(name) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute('class', 'ico')
+  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
+  use.setAttribute('href', '#i-' + name)
+  svg.append(use)
+  return svg
+}
+
 function renderHosts() {
   const list = el('host-list')
   list.replaceChildren()
   for (const host of book.hosts) {
     const mode = rowMode.get(host.id) ?? 'view'
     const li = document.createElement('li')
-    li.className = 'host-item'
+    li.className = 'host-item' + (host.id === book.current ? ' is-current' : '')
+    const actions = document.createElement('div')
+    actions.className = 'host-actions'
 
     if (mode === 'rename') {
+      li.classList.add('editing')
       const input = document.createElement('input')
       input.className = 'host-rename'
       input.value = host.label
@@ -167,10 +180,13 @@ function renderHosts() {
         runHostAction(invoke('rename_host', { id: host.id, label: input.value }))
       }
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save() })
-      li.append(input, slimButton(t('hosts.save'), save), slimButton(t('common.cancel'), () => {
+      const ok = slimButton(t('hosts.save'), save)
+      ok.classList.add('btn-primary')
+      actions.append(input, ok, slimButton(t('common.cancel'), () => {
         rowMode.delete(host.id)
         renderHosts()
       }, true))
+      li.append(actions)
       list.append(li)
       input.focus()
       continue
@@ -178,38 +194,62 @@ function renderHosts() {
 
     const main = document.createElement('button')
     main.className = 'host-pick'
+    const tile = document.createElement('div')
+    tile.className = 'tile'
+    tile.append(icon('monitor'))
+    const text = document.createElement('div')
+    text.className = 'host-text'
+    const line = document.createElement('div')
+    line.className = 'host-line'
     const name = document.createElement('span')
     name.className = 'host-name'
     name.textContent = host.label || shortId(host.id)
+    line.append(name)
+    if (host.id === book.current) {
+      const badge = document.createElement('span')
+      badge.className = 'badge badge-on'
+      badge.textContent = t('hosts.lastUsed')
+      line.append(badge)
+    }
     const meta = document.createElement('span')
-    meta.className = 'host-meta'
-    meta.textContent = mode === 'confirm'
-      ? t('hosts.deleteWarning')
-      : (host.id === book.current ? t('hosts.lastUsed', { id: shortId(host.id) }) : shortId(host.id))
-    main.append(name, meta)
-    if (mode === 'view') main.addEventListener('click', () => { startConnect(host.id) })
+    meta.className = 'host-meta' + (mode === 'confirm' ? ' warn' : ' host-id')
+    meta.textContent = mode === 'confirm' ? t('hosts.deleteWarning') : shortId(host.id)
+    text.append(line, meta)
+    main.append(tile, text)
+    if (mode === 'view') {
+      main.append(icon('chevron'))
+      main.addEventListener('click', () => { startConnect(host.id) })
+    }
     li.append(main)
 
     if (mode === 'confirm') {
-      li.append(slimButton(t('hosts.confirmDelete'), () => {
+      const del = slimButton(t('hosts.confirmDelete'), () => {
         rowMode.delete(host.id)
         runHostAction(invoke('forget_host', { id: host.id }))
-      }), slimButton(t('common.cancel'), () => {
+      })
+      del.classList.add('btn-danger')
+      actions.append(del, slimButton(t('common.cancel'), () => {
         rowMode.delete(host.id)
         renderHosts()
       }, true))
     } else {
-      li.append(slimButton(t('hosts.rename'), () => {
-        rowMode.set(host.id, 'rename')
-        renderHosts()
-      }, true), slimButton(t('hosts.delete'), () => {
+      const del = slimButton(t('hosts.delete'), () => {
         rowMode.set(host.id, 'confirm')
         renderHosts()
-      }, true))
+      }, true)
+      del.classList.add('btn-danger')
+      actions.append(slimButton(t('hosts.rename'), () => {
+        rowMode.set(host.id, 'rename')
+        renderHosts()
+      }, true), del)
     }
+    li.append(actions)
     list.append(li)
   }
   el('hosts-empty').classList.toggle('hidden', book.hosts.length > 0)
+  const count = el('hosts-count')
+  count.textContent = String(book.hosts.length)
+  count.classList.toggle('hidden', book.hosts.length === 0)
 }
 
 /** 顶栏的「已连接 · X」;改名后要跟着变,所以单独一处 */
@@ -272,6 +312,7 @@ function onState({ status, detail }) {
     stopKeepAlive()
     showView('status')
     el('connecting-note').classList.add('hidden')
+    el('reconnect-title').textContent = t('status.lost')
     el('reconnect-text').textContent = detail
     el('reconnect-row').classList.remove('hidden')
   }
@@ -559,6 +600,7 @@ async function refreshLocalCard() {
   card.classList.toggle('hidden', !st.available)
   if (!st.available) return
   el('local-state').textContent = t(st.running ? 'local.running' : 'local.idle')
+  el('local-state').classList.toggle('badge-on', st.running)
   el('local-open').textContent = t(st.running ? 'local.open' : 'local.start')
   el('local-stop').classList.toggle('hidden', !st.running)
   // 在跑时说明它「连远程也不会停」,免得通知栏那条常驻通知让人摸不着头脑
@@ -590,6 +632,7 @@ async function startLocal() {
     live = false
     el('webui').removeAttribute('src')
     el('connecting-note').classList.add('hidden')
+    el('reconnect-title').textContent = t('local.failed')
     el('reconnect-text').textContent = String(e)
     el('reconnect').textContent = t('status.retry')
     el('reconnect-row').classList.remove('hidden')
@@ -637,9 +680,8 @@ async function boot() {
   await refreshHosts()
   // 电池白名单提示只在安卓有意义:保活前台服务是安卓机制,iOS 没有可设的项
   if (/Android/i.test(navigator.userAgent)) {
-    el('battery-hint').classList.remove('hidden')
     el('wakelock-toggle').checked = wakeLockEnabled()
-    el('wakelock-setting').classList.remove('hidden')
+    el('settings-card').classList.remove('hidden')
   }
   let lastMode = null
   try { lastMode = localStorage.getItem(LAST_MODE_KEY) } catch {}

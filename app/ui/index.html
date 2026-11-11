@@ -7,8 +7,27 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- 线条图标:只做卡片/行首的装饰,不单独当按钮用 -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.5" y="3.5" width="19" height="13" rx="2"/><path d="M8 20.5h8M12 16.5v4"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></symbol>
+      <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2.5" y="7" width="16" height="10" rx="2"/><path d="M21.5 10.5v3M6 10.5v3"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M12 7.5v5.5M12 16.5h.01"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+      <symbol id="i-terminal" viewBox="0 0 24 24"><path d="m4.5 7 5 5-5 5M12 18h7.5"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5v-3a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13.5a4.5 4.5 0 0 0 6.8.5l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.6 1.6"/><path d="M14 10.5a4.5 4.5 0 0 0-6.8-.5l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.6-1.6"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="11" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2.5 4.5 13.5H12l-1 8 8.5-11H12l1-8Z"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.5s-8.5-5-8.5-11a4.5 4.5 0 0 1 8.5-2 4.5 4.5 0 0 1 8.5 2c0 6-8.5 11-8.5 11Z"/></symbol>
+    </defs>
+  </svg>
+
   <header class="topbar" id="topbar">
-    <div class="brand" id="brand">DSH Tether</div>
+    <div class="brand" id="brand"><img class="brand-icon" src="app-icon.png" alt="" />DSH Tether</div>
     <div class="status">
       <span id="status-dot" class="dot dot-off"></span>
       <span id="status-text" data-i18n="status.disconnected"></span>
@@ -18,78 +37,146 @@
   </header>
 
   <main id="view-hosts" class="view hidden">
-    <section id="local-card" class="local-card hidden">
-      <div class="local-head">
-        <span class="host-name" data-i18n="local.title"></span>
-        <span id="local-state" class="host-meta" data-i18n="local.idle"></span>
+    <section class="hero">
+      <div class="hero-icon"><img src="app-icon.png" alt="" /></div>
+      <div class="hero-text">
+        <div class="hero-title">DSH Tether</div>
+        <div class="hero-sub" data-i18n="hero.tagline"></div>
+      </div>
+    </section>
+    <div class="chips">
+      <span class="chip"><svg class="ico"><use href="#i-link"/></svg><span data-i18n="hero.p2p"></span></span>
+      <span class="chip"><svg class="ico"><use href="#i-lock"/></svg><span data-i18n="hero.noAccount"></span></span>
+    </div>
+
+    <section id="local-card" class="card local-card hidden">
+      <div class="card-head">
+        <div class="tile"><svg class="ico"><use href="#i-phone"/></svg></div>
+        <div class="card-title">
+          <span class="host-name" data-i18n="local.title"></span>
+          <span id="local-state" class="badge" data-i18n="local.idle"></span>
+        </div>
       </div>
       <p class="hint" data-i18n="local.hint"></p>
-      <p id="local-card-note" class="hint hidden" data-i18n="local.bgNote"></p>
-      <button id="local-open" class="btn btn-block" data-i18n="local.start"></button>
-      <button id="local-stop" class="btn btn-quiet btn-block hidden" data-i18n="local.stop"></button>
+      <p id="local-card-note" class="note hidden" data-i18n="local.bgNote"></p>
+      <div class="btn-row">
+        <button id="local-open" class="btn btn-primary" data-i18n="local.start"></button>
+        <button id="local-stop" class="btn btn-quiet hidden" data-i18n="local.stop"></button>
+      </div>
       <p id="local-error" class="error hidden"></p>
     </section>
-    <h1 data-i18n="hosts.title"></h1>
+
+    <div class="section-head">
+      <h2 data-i18n="hosts.title"></h2>
+      <span id="hosts-count" class="count hidden"></span>
+    </div>
     <p class="hint" data-i18n="hosts.hint"></p>
     <ul id="host-list" class="host-list"></ul>
-    <p id="hosts-empty" class="empty hidden" data-i18n="hosts.empty"></p>
-    <p id="hosts-error" class="error hidden"></p>
-    <button id="add-host" class="btn btn-block" data-i18n="hosts.add"></button>
-    <button id="hosts-back" class="btn btn-quiet btn-block" data-i18n="hosts.back"></button>
-    <!-- 安卓专属:远程连接退后台时额外持 CPU 唤醒锁,熄屏也不断;更耗电,默认关 -->
-    <div id="wakelock-setting" class="setting hidden">
-      <label class="toggle">
-        <span data-i18n="settings.wakeLock"></span>
-        <input id="wakelock-toggle" type="checkbox" role="switch" />
-      </label>
-      <p class="hint" data-i18n="settings.wakeLockHint"></p>
+    <div id="hosts-empty" class="empty-card hidden">
+      <div class="tile tile-lg"><svg class="ico"><use href="#i-monitor"/></svg></div>
+      <p class="empty-title" data-i18n="hosts.empty"></p>
+      <p class="hint" data-i18n="hosts.emptyHint"></p>
     </div>
-    <p id="battery-hint" class="hint hidden" data-i18n="hosts.batteryHint"></p>
+    <p id="hosts-error" class="error hidden"></p>
+    <button id="add-host" class="btn btn-primary btn-block btn-icon"><svg class="ico"><use href="#i-plus"/></svg><span data-i18n="hosts.add"></span></button>
+    <button id="hosts-back" class="btn btn-quiet btn-block" data-i18n="hosts.back"></button>
+
+    <!-- 安卓专属:后台连接相关的设置与提示;iOS 上整组隐藏 -->
+    <section id="settings-card" class="settings hidden">
+      <h2 data-i18n="settings.title"></h2>
+      <div class="card list-card">
+        <!-- 远程连接退后台时额外持 CPU 唤醒锁,熄屏也不断;更耗电,默认关 -->
+        <div id="wakelock-setting" class="setting">
+          <div class="tile tile-sm"><svg class="ico"><use href="#i-moon"/></svg></div>
+          <div class="setting-body">
+            <label class="toggle">
+              <span data-i18n="settings.wakeLock"></span>
+              <input id="wakelock-toggle" type="checkbox" role="switch" />
+            </label>
+            <p class="hint" data-i18n="settings.wakeLockHint"></p>
+          </div>
+        </div>
+        <div id="battery-hint" class="setting">
+          <div class="tile tile-sm"><svg class="ico"><use href="#i-battery"/></svg></div>
+          <div class="setting-body">
+            <div class="setting-title" data-i18n="settings.battery"></div>
+            <p class="hint" data-i18n="hosts.batteryHint"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <footer class="about">
       <span id="about-version">DSH Tether</span>
-      <button id="open-about" class="btn btn-slim btn-slim-quiet" data-i18n="about.entry"></button>
+      <button id="open-about" class="btn btn-slim" data-i18n="about.entry"></button>
     </footer>
   </main>
 
   <main id="view-about" class="view hidden">
-    <h1>DSH Tether</h1>
-    <p id="about-version-line" class="hint"></p>
-    <button id="about-github" class="btn btn-block">GitHub</button>
-    <button id="about-update" class="btn btn-quiet btn-block" data-i18n="update.check"></button>
-    <p id="update-status" class="hint hidden"></p>
-    <h1 data-i18n="about.thanksTitle"></h1>
-    <p class="hint" data-i18n="about.thanks"></p>
+    <section class="about-hero">
+      <div class="hero-icon hero-icon-lg"><img src="app-icon.png" alt="" /></div>
+      <div class="hero-title">DSH Tether</div>
+      <p id="about-version-line" class="hint"></p>
+      <p class="hero-sub" data-i18n="hero.tagline"></p>
+    </section>
+    <div class="card">
+      <div class="btn-row">
+        <button id="about-update" class="btn btn-primary" data-i18n="update.check"></button>
+        <button id="about-github" class="btn btn-quiet">GitHub</button>
+      </div>
+      <p id="update-status" class="note hidden"></p>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div class="tile"><svg class="ico"><use href="#i-heart"/></svg></div>
+        <div class="card-title"><span class="host-name" data-i18n="about.thanksTitle"></span></div>
+      </div>
+      <p class="hint" data-i18n="about.thanks"></p>
+    </div>
     <button id="about-back" class="btn btn-quiet btn-block" data-i18n="hosts.back"></button>
   </main>
 
   <main id="view-pair" class="view hidden">
-    <h1 data-i18n="pair.title"></h1>
-    <p class="hint" data-i18n-html="pair.hint"></p>
-    <label><span data-i18n="pair.peer"></span>
-      <input id="pair-peer" type="text" autocomplete="off" spellcheck="false" data-i18n-ph="pair.peerPlaceholder" />
-    </label>
-    <label><span data-i18n="pair.code"></span>
-      <input id="pair-code" type="text" inputmode="numeric" maxlength="6" autocomplete="off" data-i18n-ph="pair.codePlaceholder" />
-    </label>
-    <label><span data-i18n="pair.label"></span>
-      <input id="pair-label" type="text" autocomplete="off" data-i18n-ph="pair.labelPlaceholder" />
-    </label>
-    <label><span data-i18n="pair.name"></span>
-      <input id="pair-name" type="text" autocomplete="off" data-i18n-value="pair.nameDefault" />
-    </label>
+    <div class="section-head"><h2 class="page-title" data-i18n="pair.title"></h2></div>
+    <ol class="steps">
+      <li><span class="step-no">1</span><div><div class="step-title" data-i18n="pair.step1"></div><p class="hint" data-i18n-html="pair.step1Hint"></p></div></li>
+      <li><span class="step-no">2</span><div><div class="step-title" data-i18n="pair.step2"></div><p class="hint" data-i18n="pair.step2Hint"></p></div></li>
+      <li><span class="step-no">3</span><div><div class="step-title" data-i18n="pair.step3"></div><p class="hint" data-i18n="pair.step3Hint"></p></div></li>
+    </ol>
+    <div class="card form-card">
+      <label><span data-i18n="pair.peer"></span>
+        <input id="pair-peer" type="text" autocomplete="off" spellcheck="false" data-i18n-ph="pair.peerPlaceholder" />
+      </label>
+      <label><span data-i18n="pair.code"></span>
+        <input id="pair-code" type="text" inputmode="numeric" maxlength="6" autocomplete="off" data-i18n-ph="pair.codePlaceholder" />
+      </label>
+    </div>
+    <div class="card form-card">
+      <label><span data-i18n="pair.label"></span>
+        <input id="pair-label" type="text" autocomplete="off" data-i18n-ph="pair.labelPlaceholder" />
+      </label>
+      <label><span data-i18n="pair.name"></span>
+        <input id="pair-name" type="text" autocomplete="off" data-i18n-value="pair.nameDefault" />
+      </label>
+    </div>
     <p id="pair-error" class="error hidden"></p>
-    <button id="pair-submit" class="btn btn-block" data-i18n="pair.submit"></button>
+    <button id="pair-submit" class="btn btn-primary btn-block" data-i18n="pair.submit"></button>
     <button id="pair-cancel" class="btn btn-quiet btn-block" data-i18n="common.cancel"></button>
   </main>
 
-  <main id="view-status" class="view hidden">
-    <div id="reconnect-row" class="hidden">
+  <main id="view-status" class="view view-center hidden">
+    <div id="reconnect-row" class="card status-card hidden">
+      <div class="tile tile-lg tile-warn"><svg class="ico"><use href="#i-alert"/></svg></div>
+      <div id="reconnect-title" class="empty-title" data-i18n="status.lost"></div>
       <p id="reconnect-text" class="hint"></p>
-      <button id="reconnect" class="btn btn-block" data-i18n="status.reconnect"></button>
+      <button id="reconnect" class="btn btn-primary btn-block" data-i18n="status.reconnect"></button>
       <button id="open-hosts" class="btn btn-quiet btn-block" data-i18n="status.switch"></button>
     </div>
-    <p id="connecting-note" class="empty" data-i18n="status.connectingPc"></p>
-    <p id="local-bg-note" class="hint hidden" data-i18n="status.localBg"></p>
+    <div id="connecting-box" class="connecting">
+      <div class="pulse"><div class="hero-icon"><img src="app-icon.png" alt="" /></div></div>
+      <p id="connecting-note" class="connecting-text" data-i18n="status.connectingPc"></p>
+    </div>
+    <p id="local-bg-note" class="note hidden" data-i18n="status.localBg"></p>
   </main>
 
   <iframe id="webui" class="webui hidden" title="DeepSeek Harness"></iframe>
