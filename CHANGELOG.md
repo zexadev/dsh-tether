@@ -2,6 +2,34 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.31
+
+### 新增
+
+- **可以用自己的 relay**(#24)。默认用的是 iroh 官方(n0)的公共 relay,官方说明它只供开发测试、有速率限制。现在插件 config 可以写 `relayUrls`,电脑端 sidecar 改用你自己搭的 relay;手机 App 不用改。地址写错 sidecar 会带原因退出,不会悄悄退回公共 relay。配法见 README 常见问题「能用自己的 relay 吗?」。
+
+- **排障开关 `DSH_TETHER_RELAY_ONLY`**。电脑端 sidecar(与 `phone-sim`)设了这个环境变量就关掉打洞、只走 relay,用来单独验证 relay 这条路。
+
+### 修复
+
+- **手机断线后,电脑端一直以为它还连着**。手机断网或进程被杀,电脑端 sidecar 要等到下一条审批发不出去才发现;没有审批时就一直挂着,插件里的连接计数也不对。现在约 30 秒(底层空闲超时)内上报断开。
+
+- **手机换网重连后,审批发不到手机上**(#25 相关)。手机从 WiFi 切到移动数据重连时,新连接先到,旧连接约 30 秒后才收尾;收尾时把新连接也从电脑端的连接表里删了,之后审批找不到这台手机,设备列表也显示离线。现在旧连接只删自己。
+
+这三处都改在电脑端插件,升级插件、重启 dsh 即可,不用重装 APK。
+
+### English
+
+You can now use your own relay (#24). By default the public relays run by iroh's makers (n0) are used, which n0 describes as meant for development and testing, with rate limits. The plugin config now takes `relayUrls`, and the computer-side sidecar uses your relay instead; the phone app needs no change. A malformed URL makes the sidecar exit with the reason rather than quietly falling back to the public relays. See "Can I use my own relay?" in the README FAQ.
+
+New troubleshooting switch `DSH_TETHER_RELAY_ONLY`: set it for the computer-side sidecar (or `phone-sim`) to turn off hole-punching and use the relay only, so the relay path can be tested on its own.
+
+The computer side kept thinking a phone was connected after it dropped. When the phone lost its network or was killed, the sidecar only noticed when the next approval failed to send; with no approval pending it never noticed, and the plugin's connection count was off. It now reports the disconnect within about 30 seconds (the idle timeout).
+
+After a phone switched networks and reconnected, approvals stopped reaching it (related to #25). When the phone moved from Wi-Fi to mobile data, the new connection arrived first and the old one only wound down about 30 seconds later, and in doing so it removed the new connection from the computer's connection list, so approvals could not find the phone and the device list showed it offline. The old connection now only removes itself.
+
+All three are in the desktop plugin: update the plugin and restart dsh; no new APK needed.
+
 ## 0.1.30
 
 ### 变更
