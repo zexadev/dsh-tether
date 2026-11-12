@@ -659,9 +659,14 @@ async fn handle_phone(
     tokio::join!(writer, reader, proxy_acceptor);
 
     {
+        // 只删自己那条:同一台手机换网重连时,新连接已经按同一个设备 ID 覆盖了表项,
+        // 旧连接这时才收尾,按 ID 删会把新连接删掉,审批从此发不到手机上
         let mut s = state.lock().await;
-        s.conns.remove(&remote);
+        if s.conns.get(&remote).is_some_and(|p| p.conn.stable_id() == conn.stable_id()) {
+            s.conns.remove(&remote);
+        }
     }
+    // 断开照样上报:插件按连接计数,每条连接的连上与断开要成对
     emit(&PluginOut::PeerDisconnected { peer: remote });
     Ok(())
 }
