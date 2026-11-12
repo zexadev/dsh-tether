@@ -44,8 +44,6 @@ let webUiOrigin = null
 function showWebUi(url) {
   const frame = el('webui')
   webUiOrigin = new URL(url).origin
-  // 每次加载都是新文档:面板能力要等新的注入脚本重新声明
-  panelReady = false
   // 每次连上都重载:端口按主机派生后 URL 前后一致,而上一条连接的代理监听
   // 已随连接一起结束,旧页面里的 WebSocket 是死的,不重载就停在那儿。
   frame.src = url
@@ -447,12 +445,8 @@ el('hosts-back').addEventListener('click', () => {
 })
 el('add-host').addEventListener('click', openPairView)
 el('reconnect').addEventListener('click', () => { if (mode === 'local') startLocal(); else startConnect(null) })
-el('topbar-hosts').addEventListener('click', () => {
-  // 新插件的主机页长在 dsh 界面里,顶栏按钮直接叫面板出来;
-  // 旧插件没面板,退回 App 自己的主机页
-  if (live && panelReady) forwardToFrame({ type: 'dsh-tether:open-hosts' })
-  else { refreshHosts(); showView('hosts') }
-})
+// 主机页只有 App 自己这一份:它是手机界面,不该由电脑端插件来画
+el('topbar-hosts').addEventListener('click', () => { refreshHosts(); showView('hosts') })
 
 // —— 关于与致谢页 ——
 // 版本号、检查更新、GitHub 入口。外链一律走 opener 插件由系统浏览器打开:
@@ -521,9 +515,9 @@ el('open-hosts').addEventListener('click', () => { refreshHosts(); showView('hos
 
 // 主机页的入口在 dsh 侧栏底部(插件往 sidebar.footer.action 插槽挂的按钮),
 // 那个按钮在 iframe 里、跨源,只能经 postMessage 过来;只认 web UI 那个源。
-// 新版插件把主机页做进了 dsh 界面内部(「会话 / 我的电脑」两栏 tab),数据经
-// 下面的 invoke 桥走 Rust;旧版插件仍发 open-hosts,退回 App 自己的主机页。
-let panelReady = false
+// 插件 0.1.28 / 0.1.29 在 dsh 界面里另画了一份主机面板,侧栏按钮直接打开它,
+// 数据经下面的 invoke 桥走 Rust。这两版已经发出去了,桥和事件转发留着,
+// 不然连着这两版插件时面板会一直等到超时;之后的插件只发 open-hosts。
 let lastRemoteState = { status: 'disconnected', detail: '' }
 
 /**
@@ -569,7 +563,6 @@ window.addEventListener('message', (e) => {
   }
   if (d?.type === 'dsh-tether:panel-ready') {
     // 面板刚挂上,把当前连接状态补给它(它可能错过了前面的 remote:state)
-    panelReady = true
     forwardToFrame({ type: 'dsh-tether:event', name: 'remote:state', payload: lastRemoteState })
     return
   }
