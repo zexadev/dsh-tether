@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 远程保活可选的 CPU 唤醒锁(手机端页面开关,默认关);普通权限,安装即授予 -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- App 内更新:把下载好的新版 APK 交给系统安装器。首次会引导用户允许本应用
+         「安装未知应用」,之后每次安装仍由系统弹确认;本 App 不经 Google Play 分发 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application>
         <service

@@ -41,6 +41,44 @@ struct SavedDownload {
     name: String,
 }
 
+/// App 内更新:查到的版本(Kotlin DshUpdater.check 的结果)
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct UpdateCheck {
+    pub current: String,
+    pub latest: String,
+    pub available: bool,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct UpdateProgress {
+    pub downloaded: i64,
+    pub total: i64,
+}
+
+#[cfg(target_os = "android")]
+#[derive(Serialize)]
+struct UpdateDownloadArgs<'a> {
+    version: &'a str,
+}
+
+#[cfg(target_os = "android")]
+#[derive(Serialize)]
+struct UpdateInstallArgs<'a> {
+    path: &'a str,
+}
+
+#[cfg(target_os = "android")]
+#[derive(serde::Deserialize)]
+struct UpdateDownloaded {
+    path: String,
+}
+
+#[cfg(target_os = "android")]
+#[derive(serde::Deserialize)]
+struct UpdateInstalled {
+    status: String,
+}
+
 #[cfg(target_os = "android")]
 pub struct DshLocal<R: Runtime>(PluginHandle<R>);
 
@@ -70,6 +108,28 @@ impl<R: Runtime> DshLocal<R> {
         self.0
             .run_mobile_plugin::<SavedDownload>("saveDownload", SaveDownloadArgs { path, name, mime })
             .map(|saved| saved.name)
+            .map_err(Into::into)
+    }
+
+    pub fn update_check(&self) -> tauri::Result<UpdateCheck> {
+        self.0.run_mobile_plugin::<UpdateCheck>("updateCheck", ()).map_err(Into::into)
+    }
+
+    pub fn update_download(&self, version: &str) -> tauri::Result<String> {
+        self.0
+            .run_mobile_plugin::<UpdateDownloaded>("updateDownload", UpdateDownloadArgs { version })
+            .map(|d| d.path)
+            .map_err(Into::into)
+    }
+
+    pub fn update_progress(&self) -> tauri::Result<UpdateProgress> {
+        self.0.run_mobile_plugin::<UpdateProgress>("updateProgress", ()).map_err(Into::into)
+    }
+
+    pub fn update_install(&self, path: &str) -> tauri::Result<String> {
+        self.0
+            .run_mobile_plugin::<UpdateInstalled>("updateInstall", UpdateInstallArgs { path })
+            .map(|r| r.status)
             .map_err(Into::into)
     }
 }
@@ -142,6 +202,63 @@ pub fn save_download<R: Runtime>(app: &tauri::AppHandle<R>, path: &str, name: &s
     {
         let _ = (app, path, name, mime);
         Err(tauri::Error::Io(std::io::Error::new(std::io::ErrorKind::Unsupported, "save_download is Android-only")))
+    }
+}
+
+/// App 内更新,实现全在 Kotlin(DshUpdater.kt),这里只转发。都是阻塞调用:下载要
+/// 等文件落完盘才返回,调用方放到阻塞线程里。非 Android 平台报不支持。
+#[cfg(not(target_os = "android"))]
+fn android_only<T>() -> tauri::Result<T> {
+    Err(tauri::Error::Io(std::io::Error::new(std::io::ErrorKind::Unsupported, "in-app update is Android-only")))
+}
+
+pub fn update_check<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<UpdateCheck> {
+    #[cfg(target_os = "android")]
+    {
+        return app.state::<DshLocal<R>>().update_check();
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        android_only()
+    }
+}
+
+/// 下载 `version` 的安装包(与本机同 ABI),校验包名与版本号后返回落盘路径
+pub fn update_download<R: Runtime>(app: &tauri::AppHandle<R>, version: &str) -> tauri::Result<String> {
+    #[cfg(target_os = "android")]
+    {
+        return app.state::<DshLocal<R>>().update_download(version);
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (app, version);
+        android_only()
+    }
+}
+
+pub fn update_progress<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<UpdateProgress> {
+    #[cfg(target_os = "android")]
+    {
+        return app.state::<DshLocal<R>>().update_progress();
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        android_only()
+    }
+}
+
+/// 交给系统安装器。返回 "started",或 "needs-permission"(已打开「安装未知应用」设置页)
+pub fn update_install<R: Runtime>(app: &tauri::AppHandle<R>, path: &str) -> tauri::Result<String> {
+    #[cfg(target_os = "android")]
+    {
+        return app.state::<DshLocal<R>>().update_install(path);
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (app, path);
+        android_only()
     }
 }
 

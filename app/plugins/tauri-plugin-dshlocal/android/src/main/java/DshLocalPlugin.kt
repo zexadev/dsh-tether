@@ -29,6 +29,16 @@ class KeepAliveArgs {
 }
 
 @InvokeArg
+class UpdateDownloadArgs {
+  var version: String = ""
+}
+
+@InvokeArg
+class UpdateInstallArgs {
+  var path: String = ""
+}
+
+@InvokeArg
 class SaveDownloadArgs {
   var path: String = ""
   var name: String = ""
@@ -103,5 +113,54 @@ class DshLocalPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.reject(e.message ?: e.toString())
       }
     }.start()
+  }
+
+  // —— App 内更新,实现都在 DshUpdater;联网的两条不占主线程 ——
+
+  @Command
+  fun updateCheck(invoke: Invoke) {
+    Thread {
+      try {
+        val c = DshUpdater.check(activity.applicationContext)
+        invoke.resolve(JSObject().apply {
+          put("current", c.current)
+          put("latest", c.latest)
+          put("available", c.available)
+        })
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: e.toString())
+      }
+    }.start()
+  }
+
+  @Command
+  fun updateDownload(invoke: Invoke) {
+    val args = invoke.parseArgs(UpdateDownloadArgs::class.java)
+    Thread {
+      try {
+        val path = DshUpdater.download(activity.applicationContext, args.version)
+        invoke.resolve(JSObject().apply { put("path", path) })
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: e.toString())
+      }
+    }.start()
+  }
+
+  @Command
+  fun updateProgress(invoke: Invoke) {
+    invoke.resolve(JSObject().apply {
+      put("downloaded", DshUpdater.downloaded)
+      put("total", DshUpdater.total)
+    })
+  }
+
+  @Command
+  fun updateInstall(invoke: Invoke) {
+    val args = invoke.parseArgs(UpdateInstallArgs::class.java)
+    try {
+      invoke.resolve(JSObject().apply { put("status", DshUpdater.install(activity, args.path)) })
+    } catch (e: Exception) {
+      invoke.reject(e.message ?: e.toString())
+    }
   }
 }
