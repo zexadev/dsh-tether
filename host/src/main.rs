@@ -347,6 +347,12 @@ fn endpoint_builder() -> iroh::endpoint::Builder {
     let builder = Endpoint::builder(presets::N0);
     #[cfg(target_os = "android")]
     let builder = builder.dns_resolver(android_dns_resolver());
+    // 排障开关:去掉 IP 传输,所有流量只走 relay。打洞在多数网络下都会成功,
+    // 不强制就没法单独验 relay 这条数据面
+    if std::env::var_os("DSH_TETHER_RELAY_ONLY").is_some_and(|v| !v.is_empty() && v != "0") {
+        eprintln!("[tether] {}", t("DSH_TETHER_RELAY_ONLY:只走 relay,不打洞", "DSH_TETHER_RELAY_ONLY: relay only, no hole-punching"));
+        return builder.clear_ip_transports();
+    }
     builder
 }
 
