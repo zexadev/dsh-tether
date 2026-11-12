@@ -83,9 +83,16 @@ function setSlim(slim) {
   el('topbar-hosts').classList.toggle('hidden', !slim)
 }
 
-function setStatus(status, text) {
+/**
+ * text 给大顶栏的状态胶囊;name / short 给连上后的窄顶栏:
+ * 窄顶栏第一行已经写了连的是谁,第二行只要短状态,别把主机名再说一遍
+ */
+function setStatus(status, text, name = '', short = text) {
   el('status-dot').className = 'dot ' + (status === 'connected' ? 'dot-on' : status === 'connecting' ? 'dot-connecting' : 'dot-off')
   el('status-text').textContent = text
+  el('status-short').textContent = short
+  el('live-name').textContent = name
+  el('live-ico').setAttribute('href', mode === 'local' ? '#i-phone' : '#i-monitor')
 }
 
 // —— 待审批通知 ——
@@ -255,11 +262,11 @@ function renderHosts() {
 /** 顶栏的「已连接 · X」;改名后要跟着变,所以单独一处 */
 function showConnectedLabel() {
   if (mode === 'local') {
-    setStatus('connected', t('status.local'))
+    setStatus('connected', t('status.local'), t('topbar.localName'), t('local.running'))
     return
   }
   const n = hostName(connectingTo)
-  setStatus('connected', n ? t('status.connectedTo', { name: n }) : t('status.connected'))
+  setStatus('connected', n ? t('status.connectedTo', { name: n }) : t('status.connected'), n || t('topbar.remoteName'), t('status.connected'))
 }
 
 async function refreshHosts() {
@@ -289,7 +296,7 @@ function onState({ status, detail }) {
     el('reconnect-row').classList.add('hidden')
   } else if (status === 'connecting') {
     const n = hostName(connectingTo)
-    setStatus('connecting', n ? t('status.connectingTo', { name: n }) : t('status.connecting'))
+    setStatus('connecting', n ? t('status.connectingTo', { name: n }) : t('status.connecting'), n || t('topbar.remoteName'), t('status.connecting'))
   } else {
     live = false
     setStatus('disconnected', t('status.disconnected'))
@@ -640,7 +647,7 @@ async function startLocal() {
   }
   el('reconnect').textContent = t('status.reconnect')
   showWebUi(localUrl)
-  setStatus('connected', t('status.local'))
+  showConnectedLabel()
 }
 
 async function stopLocal() {

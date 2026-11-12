@@ -22,18 +22,25 @@
       <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13.5a4.5 4.5 0 0 0 6.8.5l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.6 1.6"/><path d="M14 10.5a4.5 4.5 0 0 0-6.8-.5l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.6-1.6"/></symbol>
       <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="11" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></symbol>
       <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2.5 4.5 13.5H12l-1 8 8.5-11H12l1-8Z"/></symbol>
+      <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4.5 3.5 8 7 11.5M3.5 8h13M17 12.5l3.5 3.5-3.5 3.5M20.5 16h-13"/></symbol>
       <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.5s-8.5-5-8.5-11a4.5 4.5 0 0 1 8.5-2 4.5 4.5 0 0 1 8.5 2c0 6-8.5 11-8.5 11Z"/></symbol>
     </defs>
   </svg>
 
   <header class="topbar" id="topbar">
     <div class="brand" id="brand"><img class="brand-icon" src="app-icon.png" alt="" />DSH Tether</div>
-    <div class="status">
-      <span id="status-dot" class="dot dot-off"></span>
-      <span id="status-text" data-i18n="status.disconnected"></span>
+    <!-- 下面两块只在连上后的窄顶栏里出现:当前连的是哪台(或本机) -->
+    <div class="live-tile"><svg class="ico"><use id="live-ico" href="#i-monitor"/></svg></div>
+    <div class="status-wrap">
+      <div id="live-name" class="live-name"></div>
+      <div class="status">
+        <span id="status-dot" class="dot dot-off"></span>
+        <span id="status-text" data-i18n="status.disconnected"></span>
+        <span id="status-short" data-i18n="status.disconnected"></span>
+      </div>
     </div>
     <!-- 本地模式的 dsh 界面里没有插件按钮可回主机页,顶栏给一个常驻入口 -->
-    <button id="topbar-hosts" class="btn btn-slim btn-slim-quiet topbar-hosts hidden" data-i18n="topbar.hosts"></button>
+    <button id="topbar-hosts" class="btn btn-slim btn-icon topbar-hosts hidden"><svg class="ico"><use href="#i-swap"/></svg><span data-i18n="topbar.hosts"></span></button>
   </header>
 
   <main id="view-hosts" class="view hidden">
