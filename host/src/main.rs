@@ -576,10 +576,18 @@ async fn handle_phone(
         });
     }
 
+    // 连接断了也要退出:只等下行消息的话,没有审批要发时它永远等下去,
+    // 下面的 join 就收不了尾,断开不上报、连接表里留着一条死连接
     let writer = async {
-        while let Some(line) = rx.recv().await {
-            if write_line(&mut send, &line).await.is_err() {
-                break;
+        loop {
+            tokio::select! {
+                line = rx.recv() => {
+                    let Some(line) = line else { break };
+                    if write_line(&mut send, &line).await.is_err() {
+                        break;
+                    }
+                }
+                _ = conn.closed() => break,
             }
         }
     };
