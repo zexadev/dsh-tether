@@ -15,7 +15,7 @@ use std::time::Duration;
 use anyhow::{bail, Context as _, Result};
 use clap::{Parser, Subcommand};
 use iroh::endpoint::{presets, Connection};
-use iroh::{Endpoint, EndpointId};
+use iroh::{Endpoint, EndpointId, RelayMode, RelayUrl};
 use rand::Rng;
 use tether_core::i18n::t;
 use tether_core::{
@@ -120,6 +120,11 @@ struct Cli {
         "language for the logs and for this help (zh / en); otherwise LC_ALL and LANG decide",
     ))]
     lang: Option<String>,
+    #[arg(long = "relay-url", global = true, value_parser = parse_relay_url, help = t(
+        "改用这台自建 relay(可重复给多个),替换掉 n0 的公共 relay;不给则用 n0 的",
+        "use this self-hosted relay instead of n0's public ones (repeat for several); without it n0's are used",
+    ))]
+    relay_urls: Vec<RelayUrl>,
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -281,11 +286,11 @@ async fn main() -> Result<()> {
             println!("{}", secret.public());
         }
         Cmd::Host { data_dir, pair, proxy_target } => {
-            host_main(data_dir.unwrap_or_else(default_data_dir), pair, proxy_target).await?
+            host_main(data_dir.unwrap_or_else(default_data_dir), pair, proxy_target, &cli.relay_urls).await?
         }
         Cmd::PhoneSim { proxy_listen, peer, code, name, auto, delay, data_dir } => {
             let dir = data_dir.unwrap_or_else(|| default_data_dir_named("dsh-tether-phone-sim"));
-            phone_sim_main(dir, peer, code, name, auto, delay, proxy_listen).await?
+            phone_sim_main(dir, peer, code, name, auto, delay, proxy_listen, &cli.relay_urls).await?
         }
     }
     Ok(())
@@ -343,8 +348,25 @@ fn android_dns_resolver() -> iroh::dns::DnsResolver {
         .build()
 }
 
-fn endpoint_builder() -> iroh::endpoint::Builder {
-    let builder = Endpoint::builder(presets::N0);
+/// 只认 http(s):别的 scheme 也能被 Url 解析过去,但 iroh 连不上,错要在启动时就报出来。
+/// http 只该用于本机调试(iroh-relay --dev)
+fn parse_relay_url(s: &str) -> std::result::Result<RelayUrl, String> {
+    let url: RelayUrl = s.trim().parse().map_err(|e| format!("{e}"))?;
+    match url.scheme() {
+        "https" | "http" => Ok(url),
+        other => Err(format!("{}{other}", t("relay 地址只支持 https(本机调试可用 http),收到 ", "a relay URL must be https (or http for local testing), got "))),
+    }
+}
+
+fn endpoint_builder(relay_urls: &[RelayUrl]) -> iroh::endpoint::Builder {
+    // relay_mode 替换掉 preset 里那条 relay 传输,不是追加;地址发现(pkarr/DNS)仍是 n0 的,
+    // 发布出去的地址里带的就是这里的 relay,手机按地址按需去连
+    let builder = if relay_urls.is_empty() {
+        Endpoint::builder(presets::N0)
+    } else {
+        eprintln!("[tether] {}{}", t("使用自建 relay: ", "using self-hosted relay: "), relay_urls.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "));
+        Endpoint::builder(presets::N0).relay_mode(RelayMode::custom(relay_urls.iter().cloned()))
+    };
     #[cfg(target_os = "android")]
     let builder = builder.dns_resolver(android_dns_resolver());
     // 排障开关:去掉 IP 传输,所有流量只走 relay。打洞在多数网络下都会成功,
@@ -356,11 +378,16 @@ fn endpoint_builder() -> iroh::endpoint::Builder {
     builder
 }
 
-async fn host_main(data_dir: PathBuf, force_pair: bool, proxy_target: Option<std::net::SocketAddr>) -> Result<()> {
+async fn host_main(
+    data_dir: PathBuf,
+    force_pair: bool,
+    proxy_target: Option<std::net::SocketAddr>,
+    relay_urls: &[RelayUrl],
+) -> Result<()> {
     let secret = load_or_create_secret(&data_dir.join("identity.key"))?;
     let store_path = data_dir.join("paired.json");
     let store = load_store(&store_path);
-    let ep = endpoint_builder()
+    let ep = endpoint_builder(relay_urls)
         .secret_key(secret)
         .alpns(vec![ALPN.to_vec()])
         .bind()
@@ -688,10 +715,11 @@ async fn phone_sim_main(
     auto: String,
     delay: u64,
     proxy_listen: Option<std::net::SocketAddr>,
+    relay_urls: &[RelayUrl],
 ) -> Result<()> {
     let peer: EndpointId = peer.trim().parse().map_err(|e| anyhow::anyhow!("{}{e}", t("无效的 --peer 设备 ID: ", "invalid --peer device ID: ")))?;
     let secret = load_or_create_secret(&data_dir.join("identity.key"))?;
-    let ep = endpoint_builder().secret_key(secret).bind().await?;
+    let ep = endpoint_builder(relay_urls).secret_key(secret).bind().await?;
     eprintln!("[phone-sim] {}{}", t("本机 ID: ", "local ID: "), ep.id());
     let conn = ep.connect(peer, ALPN).await.context(t("连接 host 失败", "failed to connect to the host"))?;
     let (mut send, mut recv) = conn.open_bi().await.context(t("打开控制流失败", "failed to open the control stream"))?;
