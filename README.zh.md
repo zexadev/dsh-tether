@@ -166,6 +166,37 @@ dsh plugin --profile web add .
 
 能,而且这正是真机验证过的那条路:手机关 WiFi 只走 5G、电脑在家宽,插件侧报出公网直连路径,relay 全程没用上(见[验证过什么](#验证过什么))。打洞失败退回 relay 这条路径本身,尚未在真实网络下触发过。
 
+### 能用自己的 relay 吗?
+
+能,0.1.31 起。默认用的是 iroh 官方(n0)的公共 relay,官方说明它只供开发测试、有速率限制;打洞经常失败的网络(比如手机在运营商级 NAT 后面),或公共 relay 在你那里不稳时,可以换成自己搭的。只改电脑这一侧,手机 App 不用动:电脑发布出去的地址里带的就是你的 relay,手机按地址去连。
+
+1. 在有公网 IP 和域名的服务器上跑 iroh 官方的 relay,版本与本项目锁定的一致,镜像 `n0computer/iroh-relay:v1.0.3`。最小配置(证书走内置的 Let's Encrypt,要开放 80 与 443):
+
+   ```toml
+   http_bind_addr = "[::]:80"
+
+   [tls]
+   https_bind_addr = "[::]:443"
+   hostname = "relay.example.org"
+   cert_mode = "LetsEncrypt"
+   cert_dir = "/var/lib/iroh-relay/certs"
+   contact = "you@example.org"
+   ```
+
+2. 在 dsh 的 profile 目录(如 `~/.dsh/profiles/web/`,桌面 App 是 `~/.dsh/profiles/desktop/`)的 `cordis.patch.yml` 末尾加:
+
+   ```yaml
+   - id: dsh-tether
+     name: dsh-plugin-tether
+     config:
+       relayUrls:
+         - https://relay.example.org
+   ```
+
+3. 重启 dsh。终端里会打出 `使用自建 relay: https://relay.example.org/`;地址写错 sidecar 会带原因退出,不会悄悄退回公共 relay。
+
+已知限制:手机仍要靠 iroh 的地址查询服务(`dns.iroh.link`)找到电脑,这一步不经过你的 relay;公共 relay 在手机那边整个不可达时的情况还没验证过。想单独验 relay 这条路,两端都设环境变量 `DSH_TETHER_RELAY_ONLY=1` 可以关掉打洞、只走 relay(仅限电脑端 sidecar 与 `phone-sim`)。
+
 ### 有 iOS 版吗?
 
 有,测试版。每个 Release 都带未签名的 ipa,用 AltStore、Sideloadly 一类工具自签安装(免费 Apple ID 签出来的 7 天过期)。它只在 CI 上构建,本项目没有在真机上跑过。本地模式只有 Android 有,iOS 禁止子进程。

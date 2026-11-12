@@ -159,6 +159,37 @@ No. The phone and the machine hole-punch to each other through iroh; there is no
 
 Yes, and that is the path that has been verified on a real device: Wi-Fi off, 5G only, machine on home broadband, the plugin reported a direct public path and the relay was never used (see [What has been verified](#what-has-been-verified)). The relay fallback itself has not yet been triggered on a real network.
 
+### Can I use my own relay?
+
+Yes, from 0.1.31. By default the public relays run by iroh's makers (n0) are used, which n0 describes as meant for development and testing, with rate limits. On networks where hole-punching often fails (a phone behind carrier-grade NAT, say), or where the public relays are unreliable for you, you can point it at your own. Only the computer side changes; the phone app stays as it is: the address the computer publishes names your relay, and the phone connects to it from there.
+
+1. On a server with a public IP and a domain, run iroh's official relay at the version this project locks, image `n0computer/iroh-relay:v1.0.3`. A minimal config (certificates from the built-in Let's Encrypt support; open ports 80 and 443):
+
+   ```toml
+   http_bind_addr = "[::]:80"
+
+   [tls]
+   https_bind_addr = "[::]:443"
+   hostname = "relay.example.org"
+   cert_mode = "LetsEncrypt"
+   cert_dir = "/var/lib/iroh-relay/certs"
+   contact = "you@example.org"
+   ```
+
+2. At the end of `cordis.patch.yml` in your dsh profile directory (e.g. `~/.dsh/profiles/web/`, or `~/.dsh/profiles/desktop/` for the desktop app), add:
+
+   ```yaml
+   - id: dsh-tether
+     name: dsh-plugin-tether
+     config:
+       relayUrls:
+         - https://relay.example.org
+   ```
+
+3. Restart dsh. The terminal prints `using self-hosted relay: https://relay.example.org/`; a malformed URL makes the sidecar exit with the reason rather than quietly falling back to the public relays.
+
+Known limits: the phone still finds the computer through iroh's address lookup (`dns.iroh.link`), which does not go through your relay, and the case where the public relays are entirely unreachable from the phone has not been tested. To test the relay path on its own, set `DSH_TETHER_RELAY_ONLY=1` on both ends to turn off hole-punching (the computer-side sidecar and `phone-sim` only).
+
 ### Is there an iOS app?
 
 A beta. Every release ships an unsigned IPA; sign it yourself with AltStore, Sideloadly or similar (a free Apple ID expires after 7 days). It is built only in CI and this project has never run it on a real device. Local mode is Android-only, because iOS forbids child processes.
