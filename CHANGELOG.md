@@ -2,6 +2,20 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.30
+
+### 变更
+
+- **「我的电脑」只剩一个页面**。0.1.28 起,连着电脑时点 dsh 侧栏的「我的电脑」或顶栏的「主机」,打开的是电脑端插件在 dsh 界面里画的一份面板,与 App 自己的主机页长得不一样,功能也对不齐(「熄屏时保持连接」只在 App 那份里),面板右上角还露出一行开发注释。现在两个入口都打开 App 自己的主机页(0.1.29 重新排过版的那份),左上「返回」回到会话,会话不重载。电脑端插件里的面板已删除。
+
+  要两个入口都生效,手机 App 和电脑端插件都要升到 0.1.30。只升 App 时,顶栏「主机」已经走新页面,dsh 侧栏的「我的电脑」仍会打开旧面板,旧面板照常可用。
+
+### English
+
+"My computers" is a single page again. Since 0.1.28, while connected to a computer, both dsh's sidebar "My computers" button and the top bar's "Machines" button opened a panel that the desktop plugin drew inside dsh. It looked different from the app's own machines page, lacked some of its features (the "Stay connected with the screen off" switch existed only in the app), and showed a stray developer note in its top-right corner. Both entries now open the app's own machines page (the one redesigned in 0.1.29); Back at the top-left returns to the session without reloading it. The panel has been removed from the desktop plugin.
+
+For both entries to change, update the phone app and the desktop plugin to 0.1.30. With only the app updated, the top-bar button already goes to the new page, and dsh's sidebar button still opens the old panel, which keeps working.
+
 ## 0.1.29
 
 ### 修复
