@@ -83,8 +83,12 @@ body {
 .brand { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
 .brand-icon { width: 22px; height: 22px; border-radius: 6px; background: #fff; }
 .topbar.slim .brand { display: none; }
-/* 主机页、关于页自己有大号品牌区,顶栏就只留状态 */
+/* 主机页、关于页自己有品牌区,顶栏就只留状态(主机页左边换成「返回」) */
 body:has(#view-hosts:not(.hidden), #view-about:not(.hidden)) .brand { visibility: hidden; }
+body:has(#view-hosts:not(.hidden)) .brand { display: none; }
+.topbar .topbar-back { display: none; margin: 0 auto 0 0; padding: 7px 12px 7px 8px; font-size: 13px; background: var(--card); border-color: var(--border); }
+.topbar .topbar-back .ico { width: 16px; height: 16px; }
+body:has(#view-hosts:not(.hidden)) .topbar .topbar-back { display: flex; }
 .status-wrap { flex: none; min-width: 0; max-width: 60%; }
 .live-tile, .live-name, #status-short { display: none; }
 .status {
@@ -193,7 +197,7 @@ code {
 .tile-warn { background: var(--warn-soft); color: var(--warn); }
 
 /* —— 首屏:品牌区 —— */
-.hero { display: flex; align-items: center; gap: 14px; padding: 12px 2px 4px; }
+.hero { display: flex; align-items: center; gap: 14px; padding: 6px 2px 20px; }
 .hero-icon {
   flex: none;
   width: 56px;
@@ -210,19 +214,6 @@ code {
 .hero-icon-lg { width: 80px; height: 80px; border-radius: 22px; }
 .hero-title { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
 .hero-sub { margin-top: 3px; font-size: 13px; color: var(--muted); line-height: 1.6; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 18px; }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--muted);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 5px 10px;
-}
-.chip .ico { width: 14px; height: 14px; }
 
 /* —— 卡片 —— */
 .card {
@@ -248,7 +239,7 @@ code {
 .btn-row .btn { flex: 1; }
 .local-card .error { margin: 10px 0 0; }
 
-.section-head { display: flex; align-items: center; gap: 8px; margin: 22px 0 4px; }
+.section-head { display: flex; align-items: center; gap: 8px; margin: 24px 0 10px; }
 .count {
   font-size: 11px;
   color: var(--muted);
@@ -256,7 +247,6 @@ code {
   border-radius: 999px;
   padding: 1px 8px;
 }
-.section-head + .hint { margin-bottom: 12px; }
 
 /* —— 按钮:dsh 的语汇,主操作近黑底白字,次操作浅灰填充 —— */
 .btn {
@@ -289,6 +279,8 @@ code {
   background: var(--fill-soft);
 }
 .btn-danger { color: var(--danger); }
+/* 卡片里与灰底按钮并排的次操作:白底描边,一眼和旁边的主操作分开 */
+.btn-outline { background: var(--card); border-color: var(--border); }
 .btn-slim-quiet { background: var(--fill-soft); }
 
 .error {
