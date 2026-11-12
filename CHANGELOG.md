@@ -18,6 +18,10 @@
 
 - **agent 知道你在用手机**。在手机上发消息的会话里,电脑端插件经 dsh 的运行时上下文告诉 agent「用户正在手机上使用」,agent 会按小屏组织回答:结论先行、段落短、避免宽表格与多列并排。只作用于最后一条消息从手机发出的会话:手机连着时电脑上同时开着的会话不受影响,回到电脑在同一会话里发消息就恢复原来的写法;手机断开后这段消失。没有该能力的旧版 dsh 自动跳过。
 
+### 变更
+
+- **App 外壳页面重新排版**。主机页、添加电脑、连接中、关于这几页改成卡片式:顶部是 App 图标和一句说明;本机 DSH、每台电脑各一张卡片,上次用的那台带「上次使用」标签;「返回」挪到顶栏左上;整页只有「添加电脑」一个主按钮,「停止」本机 DSH 用红字和旁边分开;安卓专属的「熄屏时保持连接」和电池优化提示收进「后台连接」一组;添加电脑的说明拆成三步;连接中显示带脉冲的图标,断线时换成一张带「重新连接」的提示卡。连上之后的窄顶栏改成「图标 + 连的是哪台(或本机) + 状态」,切回主机页的按钮带图标。连接与配对逻辑不变。
+
 ### English
 
 The composer still stayed under the keyboard. 0.1.28 set `windowSoftInputMode=adjustResize`, but the app enables edge-to-edge layout (`enableEdgeToEdge()`) on every Android version, and under edge-to-edge adjustResize no longer shrinks the window (from Android 11, and edge-to-edge is enforced from Android 15), so the keyboard simply covered the WebView. The plugin now turns the keyboard height into bottom padding on the content view, so the WebView shrinks and the composer rises with the keyboard, on every Android version.
@@ -29,6 +33,8 @@ The desktop plugin could think the phone had disconnected when it reconnected. I
 New "Stay connected with the screen off" switch (Android only). The keep-alive foreground service stops the system from killing or freezing the app, but not from putting the CPU into deep sleep once the screen is off; after a while the connection's heartbeats stop and it drops anyway. With the switch on, the CPU keeps running (the screen still turns off) while the app is in the background and connected, so long screen-off periods no longer drop the connection. It uses more battery, is off by default, and takes effect the next time the app goes to the background.
 
 The agent now knows you are on the phone. In sessions where you send messages from the phone, the desktop plugin tells the agent through dsh's runtime context that the user is on a phone, and the agent shapes its answers for a small screen: the answer first, short paragraphs, no wide tables or side-by-side columns. It applies only to sessions whose latest message came from the phone: sessions open on the computer at the same time are unaffected, sending a message from the computer in the same session switches back, and the note disappears when the phone disconnects. Older dsh builds without this capability skip it.
+
+The app's own pages were redesigned. The machines page, Add a computer, the connecting screen and About now use cards: the app icon and a one-line summary at the top; one card for DSH on this phone and one per computer, with a "Last used" tag on the latest; Back moved to the top-left of the bar; "Add a computer" is the only primary button, and "Stop" for DSH on this phone is red so it stands apart; the Android-only screen-off switch and battery note are grouped under "Background connection"; pairing instructions are three numbered steps; connecting shows a pulsing icon, and a lost connection shows a card with Reconnect. Once connected, the slim top bar shows an icon, which computer (or this phone) you are on, and the state, and its button to the machines page has an icon. Connection and pairing logic is unchanged.
 
 ## 0.1.28
 
