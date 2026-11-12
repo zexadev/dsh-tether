@@ -527,6 +527,38 @@ async fn save_download(app: AppHandle, name: String, mime: String, data: String)
     result
 }
 
+// —— App 内更新(仅安卓)。实现全在插件的 Kotlin(DshUpdater.kt),这里只转发;
+// 插件调用是阻塞的(下载要等落盘),一律放到阻塞线程,不卡 IPC ——
+
+async fn blocking<T: Send + 'static>(f: impl FnOnce() -> tauri::Result<T> + Send + 'static) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_check(app: AppHandle) -> Result<tauri_plugin_dshlocal::UpdateCheck, String> {
+    blocking(move || tauri_plugin_dshlocal::update_check(&app)).await
+}
+
+/// 下载 `version` 的安装包,返回落盘路径
+#[tauri::command]
+async fn update_download(app: AppHandle, version: String) -> Result<String, String> {
+    blocking(move || tauri_plugin_dshlocal::update_download(&app, &version)).await
+}
+
+#[tauri::command]
+async fn update_progress(app: AppHandle) -> Result<tauri_plugin_dshlocal::UpdateProgress, String> {
+    blocking(move || tauri_plugin_dshlocal::update_progress(&app)).await
+}
+
+/// 返回 "started",或 "needs-permission"(已打开「安装未知应用」设置页,用户允许后再装)
+#[tauri::command]
+async fn update_install(app: AppHandle, path: String) -> Result<String, String> {
+    blocking(move || tauri_plugin_dshlocal::update_install(&app, &path)).await
+}
+
 /// 本机 dsh 的最近输出;启动失败时给用户看原因
 #[tauri::command]
 async fn local_log(app: AppHandle) -> Vec<String> {
@@ -575,7 +607,11 @@ pub fn run() {
             keep_alive_stop,
             notify_permission_state,
             notify_request_permission,
-            save_download
+            save_download,
+            update_check,
+            update_download,
+            update_progress,
+            update_install
         ])
         .setup(|app| {
             // 窗口改在这里建(配置里 create: false):启动脚本只能在建窗口时挂,
