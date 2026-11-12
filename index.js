@@ -203,8 +203,29 @@ function applyUi(ctx) {
 }
 
 /**
+ * config.relayUrls:自建 relay 地址,一个字符串或字符串数组,不填就用 n0 的公共 relay。
+ * 类型不对直接报错;地址本身合不合法由 sidecar 判(它按 iroh 的规则解析,错了带原因退出)。
+ * 不静默退回公共 relay:配了自建却悄悄没生效,比报错更难查
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function relayUrls(value) {
+  if (value === undefined || value === null) return []
+  const list = typeof value === 'string' ? [value] : value
+  if (!Array.isArray(list) || !list.every((u) => typeof u === 'string' && u.trim() !== '')) {
+    throw new Error(
+      `[tether] ${tt(
+        'config.relayUrls 要是一个 relay 地址,或地址数组,如 ["https://relay.example.org"]',
+        'config.relayUrls must be a relay URL or a list of them, e.g. ["https://relay.example.org"]',
+      )}`,
+    )
+  }
+  return list.map((u) => u.trim())
+}
+
+/**
  * @param {import('@deepseek-ai/cordis').Context} ctx
- * @param {{hostBinary?: string, pair?: boolean, sidecar?: boolean}} [config]
+ * @param {{hostBinary?: string, pair?: boolean, sidecar?: boolean, relayUrls?: string | string[]}} [config]
  */
 function apply(ctx, config = {}) {
   // 手机 App 的本地模式:dsh 就跑在手机上,没有远端也没有配对,只要窄屏适配与
@@ -245,6 +266,7 @@ function apply(ctx, config = {}) {
   // sidecar 的人读日志与这里打在同一个终端上,语言跟着走,免得一半中文一半英文
   const args = ['host', '--proxy-target', proxyTarget, '--lang', terminalZh ? 'zh' : 'en']
   if (config.pair) args.push('--pair')
+  for (const url of relayUrls(config.relayUrls)) args.push('--relay-url', url)
   // windowsHide:dsh desktop 的插件宿主是 ELECTRON_RUN_AS_NODE 跑的 Electron,GUI 子系统、自己没有
   // console,于是 Windows 给这个 console 子系统的 sidecar 分配一个新 console 并把窗口显示出来。该
   // 选项让 libuv 传 SW_HIDE,新分配的窗口不显示;stderr 的 inherit 不受影响,在终端里跑 dsh 时
