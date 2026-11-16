@@ -470,33 +470,95 @@ function isNewer(a, b) {
 }
 
 function openExternal(url) {
-  invoke('plugin:opener|open_url', { url }).catch(() => {})
+  return invoke('plugin:opener|open_url', { url })
+}
+
+// 安卓走 App 内更新(插件 Kotlin 侧查版本、下载、校验、装包);iOS 是未签名包要用户
+// 自己重签,只能打开下载页
+const inAppUpdate = /Android/i.test(navigator.userAgent)
+/** 安卓下好的安装包路径;装的时候 App 进程会被系统结束,不用清 */
+let downloadedApk = null
+
+function updateStatus(text) {
+  const status = el('update-status')
+  status.classList.remove('hidden')
+  status.textContent = text
+}
+
+function formatMB(bytes) {
+  return (bytes / 1048576).toFixed(1) + ' MB'
 }
 
 async function checkUpdate() {
   const btn = el('about-update')
-  const status = el('update-status')
   btn.disabled = true
-  status.classList.remove('hidden')
-  status.textContent = t('update.checking')
+  updateStatus(t('update.checking'))
   try {
-    const res = await fetch(LATEST_RELEASE_API)
-    if (!res.ok) throw new Error('HTTP ' + res.status)
-    const data = await res.json()
-    const latest = String(data.tag_name || '').replace(/^v/, '')
+    let latest
+    if (inAppUpdate) {
+      latest = (await invoke('update_check')).latest
+    } else {
+      const res = await fetch(LATEST_RELEASE_API)
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      latest = String((await res.json()).tag_name || '').replace(/^v/, '')
+    }
     if (isNewer(latest, appVersion)) {
       foundVersion = latest
-      status.textContent = t('update.available', { version: 'v' + latest })
-      btn.textContent = t('update.download')
+      updateStatus(t('update.available', { version: 'v' + latest }))
+      btn.textContent = t(inAppUpdate ? 'update.downloadInstall' : 'update.download')
     } else {
-      status.textContent = t('update.latest')
+      updateStatus(t('update.latest'))
       btn.textContent = t('update.check')
     }
-  } catch {
-    status.textContent = t('update.failed')
+  } catch (e) {
+    updateStatus(t('update.failed', { error: String(e) }))
     btn.textContent = t('update.check')
   } finally {
     btn.disabled = false
+  }
+}
+
+/** 下载 foundVersion 的安装包;进度靠轮询插件里的计数 */
+async function downloadUpdate() {
+  const btn = el('about-update')
+  const bar = el('update-progress')
+  btn.disabled = true
+  btn.textContent = t('update.downloading')
+  bar.classList.remove('hidden')
+  el('update-progress-bar').style.width = '0'
+  updateStatus(t('update.downloading'))
+  const timer = setInterval(async () => {
+    try {
+      const { downloaded, total } = await invoke('update_progress')
+      if (total > 0) {
+        el('update-progress-bar').style.width = Math.min(100, (downloaded / total) * 100) + '%'
+        updateStatus(t('update.progress', { done: formatMB(downloaded), total: formatMB(total) }))
+      }
+    } catch {}
+  }, 300)
+  try {
+    downloadedApk = await invoke('update_download', { version: foundVersion })
+    el('update-progress-bar').style.width = '100%'
+    await installUpdate()
+  } catch (e) {
+    bar.classList.add('hidden')
+    updateStatus(t('update.downloadFailed', { error: String(e) }))
+    btn.textContent = t('update.downloadInstall')
+  } finally {
+    clearInterval(timer)
+    btn.disabled = false
+  }
+}
+
+/** 交给系统安装器;没允许「安装未知应用」时插件已经打开了那页设置,回来再点一次 */
+async function installUpdate() {
+  const btn = el('about-update')
+  btn.textContent = t('update.install')
+  try {
+    const status = await invoke('update_install', { path: downloadedApk })
+    updateStatus(t(status === 'needs-permission' ? 'update.needsPermission' : 'update.installStarted'))
+  } catch (e) {
+    updateStatus(t('update.installFailed', { error: String(e) }))
   }
 }
 
@@ -504,10 +566,12 @@ el('open-about').addEventListener('click', () => showView('about'))
 // 页脚版本号也能点进关于页,多个入口
 el('about-version').addEventListener('click', () => showView('about'))
 el('about-back').addEventListener('click', () => showView('hosts'))
-el('about-github').addEventListener('click', () => openExternal(PROJECT_URL))
+el('about-github').addEventListener('click', () => { openExternal(PROJECT_URL).catch((e) => updateStatus(t('update.openFailed', { error: String(e) }))) })
 el('about-update').addEventListener('click', () => {
-  if (foundVersion) openExternal(RELEASES_URL)
-  else checkUpdate()
+  if (!foundVersion) checkUpdate()
+  else if (!inAppUpdate) openExternal(RELEASES_URL).catch((e) => updateStatus(t('update.openFailed', { error: String(e) })))
+  else if (downloadedApk) installUpdate()
+  else downloadUpdate()
 })
 el('local-open').addEventListener('click', () => { startLocal() })
 el('local-stop').addEventListener('click', () => { stopLocal() })

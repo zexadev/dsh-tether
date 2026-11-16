@@ -484,7 +484,21 @@ input::placeholder { color: var(--muted); }
 .about-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 24px 0 20px; }
 .about-hero .hero-icon { margin-bottom: 8px; }
 .about-hero .hint { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
-#update-status { text-align: center; }
+#update-status { text-align: center; word-break: break-word; }
+.progress {
+  height: 6px;
+  margin-top: 14px;
+  border-radius: 999px;
+  background: var(--fill);
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width 0.2s;
+}
 
 .about {
   display: flex;
