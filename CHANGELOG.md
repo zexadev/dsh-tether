@@ -2,6 +2,26 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.32
+
+### 新增
+
+- **安卓 App 内更新**。「关于」页的「检查更新」发现新版后,按钮变成「下载并安装」:App 自己下载与本机架构对应的安装包(先走官网,不通再直连 GitHub),显示进度,下完核对包名和版本号,再交给系统安装器。第一次会先跳到系统的「安装未知应用」设置,打开开关后回来再点一次即可。
+
+  这个功能从 0.1.32 起才有,所以这一次还得手动下载安装;之后的版本就可以在 App 里直接更新。电脑端插件不用动。
+
+### 修复
+
+- **「前往下载」点了没反应**。App 打开 Releases 页时被链接白名单拦下了,现在可以正常打开;打不开时会显示原因。
+
+### English
+
+In-app updates on Android. When "Check for updates" on the About page finds a new version, the button becomes "Download and install": the app downloads the package for this phone's architecture (from the website first, falling back to GitHub), shows progress, checks the package name and version, and hands it to the system installer. The first time, Android opens the "Install unknown apps" setting; turn it on, come back and tap again.
+
+The feature starts with 0.1.32, so this one still has to be installed by hand; later versions can be updated from inside the app. The desktop plugin needs no change.
+
+"Go to download" did nothing: opening the Releases page was blocked by the app's link allow-list. It opens now, and if it cannot, the reason is shown.
+
 ## 0.1.31
 
 ### 新增
