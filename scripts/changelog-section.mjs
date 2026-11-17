@@ -1,5 +1,5 @@
 /**
- * 从 CHANGELOG.md 取出某个版本那一节,作为 Release 说明。
+ * 从 CHANGELOG.md 取出某个版本那一节,接上 .github/release-footer.md 的下载说明,作为 Release 说明。
  * 取不到就以非零码退出——宁可让流水线红,也不要发一个说明为空的 Release。
  */
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -23,6 +23,11 @@ if (body === '') {
   console.error(`"## ${version}" 这一节是空的`)
   process.exit(1)
 }
+// 每版都一样的下载说明(选哪个包、ipa 怎么装)接在后面;CHANGELOG 只写这一版变了什么
+const footer = readFileSync(new URL('../.github/release-footer.md', import.meta.url), 'utf8')
+  .replaceAll('{version}', version)
+  .trim()
+const notes = `${body}\n\n${footer}\n`
 const out = process.argv[3]
-if (out) writeFileSync(out, body + '\n')
-else process.stdout.write(body + '\n')
+if (out) writeFileSync(out, notes)
+else process.stdout.write(notes)
