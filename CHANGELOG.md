@@ -2,6 +2,27 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.33
+
+### 修复
+
+- **iOS 26 以下一启动就闪退**(#26)。底层网络库(iroh 依赖的 netdev)引用了一个 iOS 26 才有的系统接口,老系统在启动时找不到它就直接退出。iOS 14 到 25 应该都受影响。已换成不再引用它的版本,并确认新 ipa 里不再含这个符号;本项目没有 iPhone,能否正常启动还请 iOS 用户帮忙反馈。
+
+### 其他
+
+- 已验证的 dsh 版本加上 0.2.2-rc.3。
+- Release 说明末尾加了固定的下载说明:该下哪个包、ipa 怎么装(TrollStore 或自签)。
+
+安卓 App 和电脑端插件这一版没有功能变化,可以不升级。
+
+### English
+
+Fixed: the iOS app crashed at launch below iOS 26 (#26). A low-level networking library (netdev, pulled in by iroh) referenced a system API that only exists from iOS 26, so older systems quit at launch; iOS 14 to 25 are likely all affected. It now uses a version without that reference, and the new ipa was checked to no longer contain the symbol. This project has no iPhone, so reports from iOS users on whether it starts are welcome.
+
+Also: dsh 0.2.2-rc.3 added to the verified versions, and release notes now end with fixed download notes (which file to pick, how to install the ipa with TrollStore or by signing it yourself).
+
+The Android app and the desktop plugin have no functional changes in this version; updating them is optional.
+
 ## 0.1.32
 
 ### 新增
