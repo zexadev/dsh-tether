@@ -170,7 +170,7 @@ dsh plugin --profile web add .
 
 能,0.1.31 起。默认用的是 iroh 官方(n0)的公共 relay,官方说明它只供开发测试、有速率限制;打洞经常失败的网络(比如手机在运营商级 NAT 后面),或公共 relay 在你那里不稳时,可以换成自己搭的。只改电脑这一侧,手机 App 不用动:电脑发布出去的地址里带的就是你的 relay,手机按地址去连。
 
-1. 在有公网 IP 和域名的服务器上跑 iroh 官方的 relay,版本与本项目锁定的一致,镜像 `n0computer/iroh-relay:v1.0.3`。最小配置(证书走内置的 Let's Encrypt,要开放 80 与 443):
+1. 在有公网 IP 和域名的服务器上跑 iroh 官方的 relay,版本与本项目锁定的一致,镜像 `n0computer/iroh-relay:v1.4.1`。最小配置(证书走内置的 Let's Encrypt,要开放 80 与 443):
 
    ```toml
    http_bind_addr = "[::]:80"

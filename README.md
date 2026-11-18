@@ -163,7 +163,7 @@ Yes, and that is the path that has been verified on a real device: Wi-Fi off, 5G
 
 Yes, from 0.1.31. By default the public relays run by iroh's makers (n0) are used, which n0 describes as meant for development and testing, with rate limits. On networks where hole-punching often fails (a phone behind carrier-grade NAT, say), or where the public relays are unreliable for you, you can point it at your own. Only the computer side changes; the phone app stays as it is: the address the computer publishes names your relay, and the phone connects to it from there.
 
-1. On a server with a public IP and a domain, run iroh's official relay at the version this project locks, image `n0computer/iroh-relay:v1.0.3`. A minimal config (certificates from the built-in Let's Encrypt support; open ports 80 and 443):
+1. On a server with a public IP and a domain, run iroh's official relay at the version this project locks, image `n0computer/iroh-relay:v1.4.1`. A minimal config (certificates from the built-in Let's Encrypt support; open ports 80 and 443):
 
    ```toml
    http_bind_addr = "[::]:80"
