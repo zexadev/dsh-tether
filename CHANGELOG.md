@@ -2,6 +2,22 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.34
+
+### 改进
+
+- **relay 限速时 dsh 终端会提示**。连接只能走 relay 中转、且 relay 服务器开始限速时,dsh 终端打印一行 `[tether] relay 正在限速`。n0 公共 relay 有限速:实测只走公共 relay 传 16MB 用了约 36 秒,中途就收到了限速通知。手机上页面能打开、会话却加载不出来或反复「重新连接中」,又看到这行,就是被限速了(#25)。
+
+### 其他
+
+- 底层网络库 iroh 从 1.0.3 升到 1.4.1,带上它的三个安全修复:恶意 relay 数据包可让 CPU 跑满、地址解析可能崩溃、可被诱导向无关 IP 发探测包。新旧版本互通,电脑端插件和手机 App 不必同时升级,但两边都建议升到这一版。
+
+### English
+
+Improved: when the connection can only go through a relay and the relay server starts rate-limiting it, the dsh terminal now prints `[tether] the relay is rate-limiting this connection`. The public n0 relays do rate-limit: sending 16MB through a public relay alone took about 36 seconds here, and the rate-limit notice arrived midway. If the page opens on the phone but sessions won't load or it keeps reconnecting, and you see this line, that's why (#25).
+
+Also: the iroh networking library goes from 1.0.3 to 1.4.1, picking up its three security fixes (a malicious relay datagram could pin the CPU, address parsing could panic, and probes could be steered to unrelated IPs). Old and new versions interoperate, so the desktop plugin and the phone app don't have to be updated together, but updating both is recommended.
+
 ## 0.1.33
 
 ### 修复
