@@ -351,6 +351,9 @@ function apply(ctx, config = {}) {
       case 'proxy-opened':
         console.log(`[tether] ${tt('手机已开始加载界面', 'the phone started loading the interface')}`)
         break
+      case 'relay-rate-limited':
+        console.log(`[tether] ${tt('relay 正在限速', 'the relay is rate-limiting this connection')}`)
+        break
       case 'devices': {
         const waiters = pendingDevices
         pendingDevices = []

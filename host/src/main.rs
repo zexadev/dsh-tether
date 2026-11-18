@@ -230,6 +230,8 @@ enum PluginOut {
     ProxyOpened,
     /// 已配对设备全量列表;online 标出此刻连着的那些
     Devices { devices: Vec<DeviceView> },
+    /// relay 服务器通知本端出站流量被限速(每条 relay 连接至多一次)
+    RelayRateLimited,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -405,6 +407,23 @@ async fn host_main(
 
     // stdin:插件下发审批/取消/开配对
     tokio::spawn(stdin_loop(state.clone()));
+
+    // relay 限速时 iroh 只打一条 warn 日志并给计数器 +1,sidecar 没接日志,
+    // 只能轮询计数器;计数每条被限速的 relay 连接只加一次,涨了就报一次
+    {
+        let metrics = ep.metrics().socket.clone();
+        tokio::spawn(async move {
+            let mut seen = 0;
+            loop {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+                let n = metrics.relay_conns_ratelimited.get();
+                if n > seen {
+                    seen = n;
+                    emit(&PluginOut::RelayRateLimited);
+                }
+            }
+        });
+    }
 
     loop {
         tokio::select! {
