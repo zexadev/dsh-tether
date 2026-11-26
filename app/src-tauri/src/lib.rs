@@ -200,6 +200,7 @@ async fn run_connection_inner(
         Err(e) => emit_state(app, "connecting", format!("{}{e:#}", t("代理启动失败: ", "proxy failed to start: "))),
     }
     emit_state(app, "connected", t("已连接", "Connected"));
+    watch_path(app.clone(), conn.clone());
 
     let writer = async {
         while let Some(msg) = rx.recv().await {
@@ -243,6 +244,39 @@ async fn run_connection_inner(
         state.proxy_task.lock().await.take();
     }
     Ok(was_current)
+}
+
+/// 把这条连接当前走的路径(direct=打洞直连 / relay=经中转)报给前端,变了就再报。
+/// 连接刚建立时通常先走 relay,打洞成功才切直连;网络切换(Wi-Fi ↔ 移动数据)
+/// 也可能退回 relay,所以盯整个连接生命周期,而不是只报一次。
+/// 选中路径暂缺(换路中)不报,前端保留上一个值;连接关闭时 stream 结束。
+/// 已被替换的旧连接不再报,免得盖掉新连接的状态。
+fn watch_path(app: AppHandle, conn: iroh::endpoint::Connection) {
+    use n0_future::StreamExt as _;
+    tauri::async_runtime::spawn(async move {
+        let mut paths = conn.paths_stream();
+        let mut last: &'static str = "";
+        while let Some(list) = paths.next().await {
+            let Some(kind) = list
+                .iter()
+                .find(|p| p.is_selected())
+                .map(|p| if p.is_ip() { "direct" } else { "relay" })
+            else {
+                continue;
+            };
+            drop(list);
+            if kind == last {
+                continue;
+            }
+            let state = app.state::<AppState>();
+            let current = state.conn.lock().await.as_ref().is_some_and(|c| c.stable_id() == conn.stable_id());
+            if !current {
+                return;
+            }
+            last = kind;
+            let _ = app.emit("remote:path", serde_json::json!({ "kind": kind }));
+        }
+    });
 }
 
 /// 本地代理端口按主机 ID 派生:dsh 的 web UI 把「当前会话」等状态按源存在

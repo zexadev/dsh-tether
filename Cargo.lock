@@ -1265,6 +1265,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "iroh",
+ "n0-future",
  "rustls",
  "serde",
  "serde_json",

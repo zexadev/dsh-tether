@@ -16,6 +16,8 @@ let live = false
 let book = { hosts: [], current: null }
 /** 本次连的是哪台;顶栏据此显示主机名,人才知道自己在操作哪台电脑 */
 let connectingTo = null
+/** 当前连接走的路径:'direct' 打洞直连 / 'relay' 经中转 / '' 还不知道;连接中与断开时清空 */
+let remotePath = ''
 /** 'remote' 连电脑 / 'local' 手机本地跑 dsh;远程状态事件只在 remote 模式下起作用 */
 let mode = 'remote'
 /** 本地模式代理的 URL;进程还活着时切回来不用重起 */
@@ -264,7 +266,9 @@ function showConnectedLabel() {
     return
   }
   const n = hostName(connectingTo)
-  setStatus('connected', n ? t('status.connectedTo', { name: n }) : t('status.connected'), n || t('topbar.remoteName'), t('status.connected'))
+  // 直连还是中转决定了快慢:中转被限速时页面加载很慢,人得知道是路的问题(#28)
+  const path = remotePath ? ` · ${t('path.' + remotePath)}` : ''
+  setStatus('connected', (n ? t('status.connectedTo', { name: n }) : t('status.connected')) + path, n || t('topbar.remoteName'), t('status.connected') + path)
 }
 
 async function refreshHosts() {
@@ -293,10 +297,12 @@ function onState({ status, detail }) {
     if (hostName(connectingTo) === '') refreshHosts().catch(() => {})
     el('reconnect-row').classList.add('hidden')
   } else if (status === 'connecting') {
+    remotePath = ''
     const n = hostName(connectingTo)
     setStatus('connecting', n ? t('status.connectingTo', { name: n }) : t('status.connecting'), n || t('topbar.remoteName'), t('status.connecting'))
   } else {
     live = false
+    remotePath = ''
     setStatus('disconnected', t('status.disconnected'))
     el('webui').removeAttribute('src')
     // 配对页正开着就把失败原因显示在那里,别把用户踢走
@@ -729,6 +735,10 @@ async function boot() {
   await invoke('set_lang', { tag: navigator.language || '' }).catch(() => {})
   await listen('remote:state', (e) => onState(e.payload))
   await listen('remote:proxy-ready', (e) => showWebUi(e.payload.url))
+  await listen('remote:path', (e) => {
+    remotePath = e.payload.kind
+    if (live && mode === 'remote') showConnectedLabel()
+  })
   await listen('remote:approval', (e) => notifyApproval(e.payload))
   await listen('local:state', (e) => onLocalState(e.payload))
   // 见 notifyConnected:connected 可能先于 iframe 脚本就位,load 时补发
