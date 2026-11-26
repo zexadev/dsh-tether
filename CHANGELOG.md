@@ -2,6 +2,29 @@
 
 本文件记录面向用户的变化。每个版本的这一节会原样作为该版本 Release 的说明。
 
+## 0.1.35
+
+### 修复
+
+- **dsh 0.2.3-alpha 装不上插件**(#28)。插件声明支持的 dsh 版本没覆盖 0.2.3,dsh 拒绝安装。现在已加上 0.2.3-alpha.2 起的 0.2.3 版本。
+- **dsh 0.2.3-alpha 上手机打开是空白页**。0.2.3-alpha 改了浏览器登录的实现,旧版插件拿不到登录凭据,手机经隧道访问一律被拒(401)。现在两种实现都能用。
+
+### 其他
+
+- 已验证的 dsh 版本加上 0.2.2-rc.5 和 0.2.3-alpha.2。
+
+只更新电脑端插件就行,手机 App 不用动。
+
+### English
+
+Fixed: the plugin would not install on dsh 0.2.3-alpha (#28), because its declared dsh range stopped at 0.2.2. The 0.2.3 line from 0.2.3-alpha.2 is now included.
+
+Fixed: on dsh 0.2.3-alpha the phone got a blank page. 0.2.3-alpha changed how browser sign-in works, so the plugin could no longer obtain the sign-in credential and every request through the tunnel was refused (401). Both implementations work now.
+
+Also: dsh 0.2.2-rc.5 and 0.2.3-alpha.2 added to the verified versions.
+
+Only the desktop plugin needs updating; the phone app is unchanged.
+
 ## 0.1.34
 
 ### 改进
