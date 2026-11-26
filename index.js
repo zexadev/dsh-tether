@@ -433,10 +433,28 @@ function apply(ctx, config = {}) {
   ctx.inject(['connection'], (connCtx) => {
     // rc.7/rc.8 也有 connection 服务,只是没有浏览器认证;判据必须是能力
     // 本身而不是服务存在性(实测 rc.8 走到这里,靠服务存在性判会误报错)
-    if (typeof connCtx.connection.authenticatedUrl !== 'function') return
+    // 0.2.3-alpha 起认证拆成独立插件 host-authentication-token,authenticatedUrl
+    // 从 connection 上移除,带 token 的入口 URL 改由它挂在 webserver/entry-url 事件上给出
+    // (dsh 自己打印启动 URL、remote-connection 的 tokenLoginUrl 都这么取)。新版的判据是
+    // connection.authentication 注册表存在:有它就有认证,取不到 token 必须报错而不是静默跳过
+    const legacy = typeof connCtx.connection.authenticatedUrl === 'function'
+    if (!legacy && connCtx.get('connection.authentication') === undefined) return
     const authority = new URL(`http://${proxyTarget}`).host
+    const baseUrl = `http://${proxyTarget}/`
+    const tokenUrl = () => {
+      if (legacy) return connCtx.connection.authenticatedUrl(baseUrl)
+      const entries = []
+      ctx.emit(ctx.webServer, 'webserver/entry-url', baseUrl, entries)
+      const root = new URL(baseUrl)
+      const hit = entries.find((entry) => {
+        const url = new URL(entry.url)
+        return url.origin === root.origin && url.pathname === root.pathname && url.searchParams.getAll('token').length === 1
+      })
+      if (hit === undefined) throw new Error(tt('webserver/entry-url 没有给出带 token 的入口', 'webserver/entry-url offered no entry carrying a token'))
+      return hit.url
+    }
     const exchange = async () => {
-      const url = connCtx.connection.authenticatedUrl(`http://${proxyTarget}/`)
+      const url = tokenUrl()
       const res = await fetch(url, { redirect: 'manual' })
       const setCookie = res.headers.getSetCookie()
       if (res.status !== 303 || setCookie.length !== 1) {
@@ -457,7 +475,12 @@ function apply(ctx, config = {}) {
         }
       }
     }
-    void exchangeWithRetry()
+    // 新版的 token 提供方是另一个插件,connection 就绪时它未必已挂上 entry-url;
+    // 等 loader 把这一轮插件都装完再兑换(dsh 打印启动 URL 也是等这一步)
+    const loader = legacy ? undefined : ctx.get('loader')
+    void (typeof loader?.await === 'function' ? loader.await() : Promise.resolve())
+      .catch(() => {})
+      .then(exchangeWithRetry)
     // cookie 绝对有效期默认 30 天,dsh 进程可能活得更久;定期重兑换续上
     const timer = setInterval(() => { void exchangeWithRetry() }, 12 * 60 * 60 * 1000)
     connCtx.effect(() => () => clearInterval(timer))
