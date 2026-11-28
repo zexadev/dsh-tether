@@ -79,7 +79,7 @@ dsh plugin --profile web add .
 
 ## Pair
 
-Start `dsh web` as you normally would, then click **Connect phone** at the bottom of the sidebar. You get one line to copy:
+Start `dsh web` as you normally would, then open **Settings** and pick **Connect a phone**. You get one line to copy:
 
 On the phone, open DSH Tether → **Add computer** → paste that whole line → name the computer → connect.
 
@@ -114,7 +114,7 @@ The Termux route still works if you prefer it: install dsh and this plugin insid
   <tr>
     <td width="50%" valign="top">
       <h3>Several machines</h3>
-      <p><em>My computers</em>, at the bottom of the phone's sidebar, keeps every machine you have paired: switch, rename, remove, or add another. Changing machines never means re-entering credentials, and <em>Connect phone</em> on the computer mints a fresh code any time.</p>
+      <p><em>My computers</em>, in the phone's settings menu, keeps every machine you have paired: switch, rename, remove, or add another. In the app, picking it hands straight over to the native computers screen. Changing machines never means re-entering credentials, and <em>Settings → Connect a phone</em> on the computer mints a fresh code any time.</p>
     </td>
     <td width="50%" valign="top">
       <h3>Approval notifications</h3>

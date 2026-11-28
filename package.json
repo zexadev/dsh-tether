@@ -25,12 +25,18 @@
   "author": "zexadev",
   "type": "module",
   "main": "index.js",
+  "scripts": {
+    "check": "node --check index.js && node --check lib/client.js",
+    "test": "node --test test/*.test.mjs"
+  },
   "exports": {
     ".": "./index.js",
+    "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
+    "lib",
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",
@@ -39,6 +45,9 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
     },
     "androidRuntime": {
       "node": "24.18.0",
