@@ -29,6 +29,7 @@ jobs:
       - name: 插件与前端语法自检
         run: |
           node --check index.js
+          node --check lib/client.js
           node --check app/ui/main.js
           node --check scripts/pack-host.mjs
           node --check scripts/changelog-section.mjs

@@ -583,8 +583,9 @@ el('local-open').addEventListener('click', () => { startLocal() })
 el('local-stop').addEventListener('click', () => { stopLocal() })
 el('open-hosts').addEventListener('click', () => { refreshHosts(); showView('hosts') })
 
-// 主机页的入口在 dsh 侧栏底部(插件往 sidebar.footer.action 插槽挂的按钮),
-// 那个按钮在 iframe 里、跨源,只能经 postMessage 过来;只认 web UI 那个源。
+// 主机页的入口在 dsh 的**设置**菜单里(插件注册的「我的电脑」一页,点进来就
+// 发 open-hosts 切到这里)。界面在 iframe 里、跨源,只能经 postMessage 过来;
+// 只认 web UI 那个源。
 // 插件 0.1.28 / 0.1.29 在 dsh 界面里另画了一份主机面板,侧栏按钮直接打开它,
 // 数据经下面的 invoke 桥走 Rust。这两版已经发出去了,桥和事件转发留着,
 // 不然连着这两版插件时面板会一直等到超时;之后的插件只发 open-hosts。

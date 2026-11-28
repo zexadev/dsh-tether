@@ -229,8 +229,8 @@ function relayUrls(value) {
  */
 function apply(ctx, config = {}) {
   // 手机 App 的本地模式:dsh 就跑在手机上,没有远端也没有配对,只要窄屏适配与
-  // 目录选择器替换(patch 里那两条)。侧栏底部的按钮在 iframe 里照样出现,它把
-  // 「打开主机页」交给外层 App,与远程模式一致。
+  // 目录选择器替换(patch 里那两条)。设置菜单里那页「我的电脑」在 iframe 里照样
+  // 出现,它把「打开主机页」交给外层 App,与远程模式一致。
   if (config.sidecar === false) {
     applyUi(ctx)
     return
@@ -660,16 +660,6 @@ const shellDialogCss = `
  * 哈希,dsh 一改样式就会变,针对它们写规则必碎。
  */
 const tetherCss = `
-/* 侧栏底部的 sidebar.footer.action 是横排 flex 行,官方设想里放并排的小动作。
-   「连接手机」照抄「设置」的类,是占满一行的触发行;别的插件(dsh-cost-meter)
-   又往同一行放 width:100% 的面板,横排下两者互挤:本按钮被压到只剩图标,
-   rail 态更被顶出 56px 的侧栏。改成纵向堆叠,各占一行;独占时与横排等价。
-   rail 态容器宽随内容,居中才与「设置」图标对齐。 */
-[class*="footArea"] > [class*="footerActions"] {
-  flex-direction: column !important;
-  align-items: stretch !important;
-}
-[class*="collapsed"] [class*="footArea"] > [class*="footerActions"] { align-items: center !important; }
 @media (max-width: 640px) {
   /* hero 背后的装饰性发光椭圆比视口宽,会让整页能被横向拖动 */
   html, body { overflow-x: hidden; }
@@ -890,24 +880,19 @@ const tetherScript = `
     document.body.append(mask)
   }
 
-  // 侧栏底部的 sidebar.footer.action 插槽:官方留给第三方放自己入口的位置。
-  // 这里放「主机」按钮,点了让外层的手机客户端打开它自己的主机页。
-  // 同一个按钮两种归宿:手机 App 里打开它自己的主机页;电脑浏览器/桌面端打开
-  // 「连接手机」功能页(配对新手机、已配对设备、使用说明),好让用户换手机、
-  // 加设备时有地方拿新配对码(否则只能去删 paired.json)。
-  // 判据是「App 自己挂的标记」,不是「我在不在 iframe 里」:dsh 桌面端的插件界面
-  // 同样跑在宿主的内嵌 frame 里,按 window.parent !== window 判会被当成手机 App,
-  // 按钮变「我的电脑」、点了只往父窗口发一条消息——桌面端没有这条消息的监听者,
-  // 按钮就是死的。标记拿不到一律按浏览器处理,打开功能页,至少点得动;
-  // 0.1.24 及更早的 App 没有这个标记,在 App 里也会打开功能页(它自己的顶栏有
-  // 「主机」入口,功能不丢)。
+  // 手机 App 会在 web 界面里挂这个标记:客户端半边据此把设置页换成「我的电脑」
+  // 一步跳转,下面用它把连接阶段的加载文字换掉。桌面端与浏览器都没有它。
+  // 判据是「App 自己挂的标记」,不是「我在不在 iframe 里」:dsh 桌面端的插件
+  // 界面同样跑在宿主的内嵌 frame 里,按 window.parent !== window 判会被当成
+  // 手机 App。标记拿不到一律按浏览器处理;0.1.24 及更早的 App 没有这个标记,
+  // 在 App 里也按浏览器处理(它自己的顶栏有「主机」入口,功能不丢)。
   var inApp = !!window.__DSH_TETHER_APP__
 
   // 已配对手机列表。白名单每条都持有访问权,而手机重装 App 会换身份密钥,
   // 旧条目就此变成没人认识的常驻凭证——这里是撤销它们的地方。
   function devicesBlock(t, slim) {
     var box = document.createElement('div')
-    box.style.cssText = 'flex:none;border-top:1px solid ' + t.line + ';padding:12px 16px 14px'
+    box.style.cssText = 'flex:none;border-top:1px solid ' + t.line + ';padding-top:14px'
     var head = document.createElement('div')
     head.style.cssText = 'font-size:12px;color:' + t.muted + ';padding-bottom:8px'
     head.textContent = tx('已配对的手机', 'Paired phones')
@@ -928,7 +913,7 @@ const tetherScript = `
         row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:7px 0'
         var dot = document.createElement('span')
         dot.style.cssText = 'flex:none;width:7px;height:7px;border-radius:50%;background:'
-          + (d.online ? '#12b76a' : t.line)
+          + (d.online ? t.online : t.line)
         dot.title = d.online ? tx('在线', 'online') : tx('离线', 'offline')
         var label = document.createElement('div')
         label.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
@@ -987,48 +972,53 @@ const tetherScript = `
     return box
   }
 
-  // —— 「连接手机」功能页 ——
-  // 侧栏按钮在浏览器/桌面端打开的是这个功能页:配对新手机、已配对设备管理、
-  // 使用说明三段,不再是原来只有一个配对串的查看页。样式 token 与 viewer 同源,
-  // 窄屏铺满、宽屏居中卡片,行为也一致(宽屏点遮罩关闭)。
-  function showPairing() {
-    var dark = matchMedia('(prefers-color-scheme: dark)').matches
-    var t = dark
-      ? { fg: '#f9fafb', surface: '#2c2c2e', line: 'rgba(255,255,255,.12)', muted: '#adb2b8', danger: '#f5766b', fill: '#353638' }
-      : { fg: '#0f1115', surface: '#ffffff', line: 'rgba(0,0,0,.1)', muted: '#81858c', danger: '#b42318', fill: '#f5f6f7' }
+  // —— 「连接手机」设置页 ——
+  // 客户端半边(lib/client.js)把这一页注册成设置弹窗导航里的「连接手机」:挂载时
+  // 把节点交给 __DSH_TETHER_MOUNT__,卸载时跑它返回的清理函数。页面还是原来功能页
+  // 那三段——配对新手机、已配对设备、使用说明——只是长在设置页里,不再是盖住整个
+  // 界面的浮层。
+  //
+  // 配色全取 dsh 的主题变量:设置弹窗本身就是 dsh 的界面,底色、分隔线、次要文字
+  // 都跟当前主题走,不按 prefers-color-scheme 猜——用户能把主题锁成亮或暗,第三方
+  // 主题还会换色。
+  window.__DSH_TETHER_MOUNT__ = function (node) {
+    var disposePage = null
 
-    var mask = document.createElement('div')
-    mask.setAttribute('data-dsh-tether', 'viewer')
-    mask.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;'
-      + 'font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;color:' + t.fg + ';'
-      + (narrow.matches ? 'background:' + t.surface : 'background:rgba(0,0,0,.32);padding:24px')
+    function draw() {
+      if (disposePage !== null) disposePage()
+      var built = settingsPage()
+      disposePage = built.dispose
+      node.replaceChildren(built.page)
+    }
+    draw()
 
-    var card = document.createElement('div')
-    card.setAttribute('data-dsh-tether', 'card')
-    card.setAttribute('role', 'dialog')
-    card.setAttribute('aria-modal', 'true')
-    card.style.cssText = 'display:flex;flex-direction:column;background:' + t.surface + ';'
-      + (narrow.matches
-        ? 'width:100%;height:100%'
-        : 'width:min(560px,100%);max-height:min(80vh,720px);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.24)')
+    // dsh 的语言能在设置里当场切:重画整页。配对串会被重新取一次——换语言不常见,
+    // 重取一份比留着一页旧语言的文字干净。
+    var langObserver = new MutationObserver(function () { draw() })
+    langObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] })
 
+    return function () {
+      langObserver.disconnect()
+      if (disposePage !== null) disposePage()
+      disposePage = null
+      node.textContent = ''
+    }
+  }
+
+  /** 生成设置页节点。dispose 停掉配对串倒计时,并让还在路上的请求作废。 */
+  function settingsPage() {
+    var alive = true
+    var tick = null
+    var t = {
+      line: 'var(--dsw-alias-border-l2)',
+      muted: 'var(--dsw-alias-label-tertiary)',
+      danger: 'var(--dsw-alias-state-error-primary)',
+      fill: 'var(--dsw-alias-bg-layer-3)',
+      online: 'var(--dsw-alias-state-success-primary)',
+    }
     // dsh 的次要按钮就是这个样子:透明底 + 1px 描边 + 14 圆角 + 12px 常规字重
     var slim = 'flex:none;font:inherit;font-size:12px;font-weight:400;padding:5px 12px;border-radius:14px;'
       + 'border:1px solid ' + t.line + ';background:transparent;color:inherit;cursor:pointer'
-
-    var bar = document.createElement('div')
-    bar.style.cssText = 'flex:none;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid ' + t.line
-    var name = document.createElement('div')
-    name.style.cssText = 'flex:1;min-width:0;font-size:16px;font-weight:500'
-    name.textContent = tx('连接手机', 'Connect a phone')
-    var close = document.createElement('button')
-    close.textContent = tx('关闭', 'Close')
-    close.style.cssText = slim
-    close.addEventListener('click', function () { mask.remove() })
-    bar.append(name, close)
-
-    var body = document.createElement('div')
-    body.style.cssText = 'flex:1;min-height:0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:18px'
 
     function sectionTitle(text) {
       var head = document.createElement('div')
@@ -1036,6 +1026,25 @@ const tetherScript = `
       head.textContent = text
       return head
     }
+
+    var page = document.createElement('div')
+    page.setAttribute('data-dsh-tether', 'settings-page')
+    page.style.cssText = 'display:flex;flex-direction:column;gap:18px;width:100%;max-width:720px;min-width:0;'
+      + 'color:var(--dsw-alias-label-primary)'
+
+    // —— 页头 ——(dsh 设置页的版式:标题 16/24 中等,说明 14/22 次要色)
+    var head = document.createElement('div')
+    head.style.cssText = 'display:flex;flex-direction:column;gap:6px'
+    var title = document.createElement('h2')
+    title.style.cssText = 'margin:0;font-size:16px;line-height:24px;font-weight:500;color:inherit'
+    title.textContent = tx('连接手机', 'Connect a phone')
+    var intro = document.createElement('p')
+    intro.style.cssText = 'margin:0;font-size:14px;line-height:22px;color:' + t.muted
+    intro.textContent = tx(
+      '配对一台手机后,这台电脑上的 dsh 就能在手机上远程使用;审批请求会作为通知送到手机。',
+      'Once a phone is paired it can use dsh on this computer remotely, and approval requests arrive there as notifications.',
+    )
+    head.append(title, intro)
 
     // —— 配对新手机 ——
     var pairBox = document.createElement('div')
@@ -1069,19 +1078,24 @@ const tetherScript = `
 
     // 配对串的获取与有效期倒计时;过期后只有「重新获取」一条路
     var pairingValue = null
-    var tick = null
     var expiresAt = 0
+    function stopTick() {
+      if (tick === null) return
+      clearInterval(tick)
+      tick = null
+    }
     function fetchPairing() {
       pairingValue = null
       copy.disabled = true
       copy.textContent = tx('复制', 'Copy')
-      if (tick !== null) { clearInterval(tick); tick = null }
+      stopTick()
       pairCode.textContent = tx('获取中…', 'Fetching…')
       pairHint.style.color = t.muted
       pairHint.textContent = ''
       fetch('${PAIRING_PATH}', { headers: langHeaders() })
         .then(function (r) { return r.ok ? r.json() : r.text().then(function (x) { throw new Error(x) }) })
         .then(function (d) {
+          if (!alive) return
           pairingValue = d.pairingString
           expiresAt = Date.now() + d.expiresInSec * 1000
           pairCode.textContent = d.pairingString
@@ -1090,8 +1104,7 @@ const tetherScript = `
           tick = setInterval(function () {
             var left = Math.max(0, Math.round((expiresAt - Date.now()) / 1000))
             if (left === 0) {
-              clearInterval(tick)
-              tick = null
+              stopTick()
               pairingValue = null
               copy.disabled = true
               pairHint.style.color = t.danger
@@ -1103,6 +1116,7 @@ const tetherScript = `
           }, 1000)
         })
         .catch(function (e) {
+          if (!alive) return
           pairHint.style.color = t.danger
           pairHint.textContent = tx('获取失败: ', 'Fetch failed: ') + (e && e.message ? e.message : e)
           pairCode.textContent = tx('获取失败', 'Fetch failed')
@@ -1136,153 +1150,15 @@ const tetherScript = `
       guide.append(step)
     }
 
-    body.append(pairBox, devices, guide)
-    card.append(bar, body)
-    mask.append(card)
-    // 宽屏点遮罩关闭,窄屏没有遮罩可点
-    if (!narrow.matches) mask.addEventListener('click', function (e) { if (e.target === mask) mask.remove() })
-    document.body.append(mask)
-  }
-
-  // 可抄样式的参照行。浏览器侧是「设置」:triggerRow(定高的横排容器)套 trigger
-  // (flex:1 1 0%)两层,只抄里层放进纵向堆叠的插槽,basis 0% 会变成高度、按钮塌成
-  // 一行字,所以两层都抄。dsh desktop 的设置入口在原生壳里(⌘,),侧栏里没有
-  // settings.trigger,但 footer 底下那一行(登录后是账号行,没登录是「更多」)是同一
-  // 族的 triggerRow,改抄它。
-  function hostsReference() {
-    var settings = document.querySelector('[data-slot="settings.trigger"]')
-    var trigger = settings && settings.closest ? settings.closest('button') : null
-    if (trigger && trigger.parentElement) return { row: trigger.parentElement, trigger: trigger, browser: true }
-    var row = document.querySelector('[class*="settingsArea"] [class*="triggerRow"]')
-    var button = row && row.querySelector('button')
-    if (row && button) return { row: row, trigger: button, browser: false }
-    return null
-  }
-
-  // 同一行里 padding + 图标 + gap 决定文字从哪开始,所以图标与参照行一样宽,两行的
-  // 图标列和文字列才对齐。桌面端那一行会随登录状态换形态(没登录是 14px 字形,登录
-  // 后是 24px 头像),宽度因此是量参照行量出来的,不写死;量不到就退回 16。
-  function referenceIconWidth(trigger) {
-    var art = trigger.querySelector('svg, img')
-    var width = art ? Math.round(art.getBoundingClientRect().width) : 0
-    return width >= 12 && width <= 24 ? width : 16
-  }
-
-  // 参照行里装文字的那个 span。登录后账号行是「头像 span + 文字 span」两个,头像那个
-  // 24×24、圆、带 skeleton 底色,抄到它中文就竖成一字一行;头像恒在文字前面,所以取
-  // 末位。判据是「里面没有元素、不带 data-avatar-status」,不认类名 —— 类名带内容哈希。
-  // 侧栏收起时那一行只有图标、没有文字 span,返回 null。
-  function referenceLabelOf(trigger) {
-    var spans = trigger.querySelectorAll('span')
-    var picked = null
-    for (var i = 0; i < spans.length; i++) {
-      var span = spans[i]
-      if (span.children.length === 0 && !span.hasAttribute('data-avatar-status')) picked = span
+    page.append(head, pairBox, devices, guide)
+    return {
+      page: page,
+      dispose: function () {
+        alive = false
+        stopTick()
+      },
     }
-    return picked
   }
-
-  // dsh 自己那套小图标的画法:16 视图框、1.3px 描边,字形落在 1.5~14.5 的方框里
-  function phoneIcon(size) {
-    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">'
-      + '<rect x="5.15" y="2.15" width="5.7" height="11.7" rx="1.6"/><path d="M7.1 11.6h1.8" stroke-linecap="round"/></svg>'
-  }
-
-  function mountHostsTrigger() {
-    var slot = document.querySelector('[data-slot="sidebar.footer.action"]')
-    if (!slot || slot.querySelector('[data-dsh-tether="hosts-trigger"]')) return
-    var reference = hostsReference()
-    var row = document.createElement('div')
-    row.setAttribute('data-dsh-tether', 'hosts-row')
-    var button = document.createElement('button')
-    button.type = 'button'
-    button.setAttribute('data-dsh-tether', 'hosts-trigger')
-    var label = inApp ? tx('我的电脑', 'My computers') : tx('连接手机', 'Connect a phone')
-    button.setAttribute('aria-label', label)
-    // 浏览器侧沿用原来那个 18px 图标,一字不改;抄不到「设置」时按参照行的尺寸画
-    var icon = reference === null || reference.browser
-      ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>'
-      : phoneIcon(referenceIconWidth(reference.trigger))
-    button.innerHTML = icon + '<span data-dsh-tether="hosts-label">' + label + '</span>'
-    button.addEventListener('click', function () {
-      // 主机页是手机界面,由 App 自己画;这里只通知外层 App 切过去
-      if (inApp) window.parent.postMessage({ type: 'dsh-tether:open-hosts' }, '*')
-      else showPairing()
-    })
-    row.append(button)
-    slot.append(row)
-    if (reference === null) {
-      ensureFallbackStyle()
-    } else {
-      var labelSpan = button.querySelector('[data-dsh-tether="hosts-label"]')
-      // 类名带内容哈希,照抄参照行当前的,外观自然跟随 dsh 自己的构建。侧栏收起/
-      // 展开、登录状态变化时它会换类名,也会换图标尺寸,跟着同步
-      var sync = function () {
-        row.className = reference.row.className
-        button.className = reference.trigger.className
-        if (reference.browser) return
-        // 参照行换形态时文字 span 会换一个节点(登录后前面多出头像),每次重挑
-        var referenceLabel = referenceLabelOf(reference.trigger)
-        // 侧栏收成竖条时参照行干脆不渲染文字,我们的文字也跟着收掉
-        labelSpan.style.display = referenceLabel ? '' : 'none'
-        if (referenceLabel) labelSpan.className = referenceLabel.className
-        // 账号行的形态写在自己的 data-* 上(没登录 32px 矮一截,收起时 36×36 居中),
-        // 光抄类名只拿到组件的默认形态,会比隔壁高一截。属性名按前缀抄,不写死是哪几个
-        for (var i = button.attributes.length - 1; i >= 0; i--) {
-          var own = button.attributes[i].name
-          if (own.indexOf('data-') === 0 && own !== 'data-dsh-tether') button.removeAttribute(own)
-        }
-        for (var j = 0; j < reference.trigger.attributes.length; j++) {
-          var attr = reference.trigger.attributes[j]
-          if (attr.name.indexOf('data-') === 0 && attr.name !== 'data-dsh-tether') button.setAttribute(attr.name, attr.value)
-        }
-        var svg = button.querySelector('svg')
-        var width = referenceIconWidth(reference.trigger)
-        if (svg) { svg.setAttribute('width', width); svg.setAttribute('height', width) }
-      }
-      sync()
-      // 浏览器侧只有类名会变,照旧只盯 class;桌面端那一行换形态是改 data-*,得全盯
-      new MutationObserver(sync).observe(reference.row, reference.browser
-        ? { attributes: true, attributeFilter: ['class'], subtree: true }
-        : { attributes: true, subtree: true })
-    }
-    // dsh 的语言能在设置里当场切,这个标签跟着换
-    new MutationObserver(function () {
-      var next = inApp ? tx('我的电脑', 'My computers') : tx('连接手机', 'Connect a phone')
-      button.setAttribute('aria-label', next)
-      var span = button.querySelector('[data-dsh-tether="hosts-label"]')
-      if (span) span.textContent = next
-    }).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] })
-  }
-  // 两处参照都抄不到时的兜底。只保证这一行能看、能点:宽度铺满插槽、行高与 dsh 的
-  // panelRow 一致,颜色圆角焦点环全取 --dsw-* 变量,不碰任何带内容哈希的类名,也不
-  // 去猜隔壁此刻长什么样。抄不到就不挂按钮的话,桌面端等于没有配对入口。
-  var fallbackStyleInstalled = false
-  function ensureFallbackStyle() {
-    if (fallbackStyleInstalled) return
-    fallbackStyleInstalled = true
-    var style = document.createElement('style')
-    style.setAttribute('data-dsh-tether', 'fallback-style')
-    style.textContent = [
-      '[data-dsh-tether="hosts-row"] { box-sizing: border-box; flex: none; display: flex; align-items: center; width: 100%; }',
-      '[data-dsh-tether="hosts-row"] > [data-dsh-tether="hosts-trigger"] {',
-      '  -webkit-appearance: none; appearance: none; box-sizing: border-box;',
-      '  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px;',
-      '  height: 36px; margin: 0; padding: 6px; border: none;',
-      '  border-radius: var(--dsw-radius-md); background: transparent;',
-      '  color: var(--dsw-alias-label-primary); font: inherit; font-size: 14px; line-height: 22px;',
-      '  text-align: left; cursor: pointer; overflow: hidden;',
-      '}',
-      '[data-dsh-tether="hosts-row"] > [data-dsh-tether="hosts-trigger"]:hover { background: var(--dsw-alias-interactive-bg-hover); }',
-      '[data-dsh-tether="hosts-row"] [data-dsh-tether="hosts-label"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
-      '[data-sidebar-collapsed] [data-dsh-tether="hosts-row"] > [data-dsh-tether="hosts-trigger"] { justify-content: center; gap: 0; padding: 0; }',
-      '[data-sidebar-collapsed] [data-dsh-tether="hosts-label"] { display: none; }',
-    ].join(' ')
-    document.head.append(style)
-  }
-
-  mountHostsTrigger()
-  new MutationObserver(mountHostsTrigger).observe(document.documentElement, { childList: true, subtree: true })
 
   // —— 连接阶段的加载文字 ——
   // 手机 App 里,连接阶段把 dsh 自己的加载文字「正在加载工作区… / Loading
